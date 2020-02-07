@@ -1,9 +1,9 @@
 use crate::errors::*;
-use crate::format::blocks::*;
 use crate::format::blocks::output::*;
+use crate::format::blocks::*;
+use crate::format::Attention;
 use chrono::{DateTime, Local};
 use nl80211::Socket;
-use crate::format::Attention;
 
 // Block is a block that transmits time and date data
 pub struct NetworkBlock {
@@ -88,16 +88,7 @@ impl NetworkBlock {
         };
 
         let mut ping_cmd = std::process::Command::new("ping");
-        ping_cmd.args(&[
-            "ping",
-            "-c",
-            "2",
-            "-W",
-            "2",
-            "-I",
-            &iface_name,
-            "8.8.8.8",
-        ]);
+        ping_cmd.args(&["ping", "-c", "2", "-W", "2", "-I", &iface_name, "8.8.8.8"]);
 
         let status = match ping_cmd.status() {
             Ok(s) => s,
@@ -121,7 +112,8 @@ impl Block for NetworkBlock {
 
     // update updates the network information
     fn update(&mut self) -> Result<(), UpdateError> {
-        self.next_update_time = self.next_update_time + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS.into());
+        self.next_update_time =
+            self.next_update_time + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS.into());
 
         // strength
         let station = match self.iface.get_station_info() {
@@ -136,7 +128,7 @@ impl Block for NetworkBlock {
 
         // get signal strength
         if let Some(s) = station.signal {
-            let dbm = nl80211::parse_i32(&s);
+            let dbm = nl80211::parse_i8(&s);
             self.strength_percent = dbm_to_percentage(dbm) as i32;
         } else {
             // if no signal, disconnected maybe?
@@ -165,7 +157,7 @@ impl Block for NetworkBlock {
                 primary_text: self.ssid.clone(),
                 secondary_text: self.status.to_string(),
             })),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -176,11 +168,10 @@ fn get_interface(
     interfaces: Vec<nl80211::Interface>,
 ) -> Option<nl80211::Interface> {
     for iface in interfaces {
-        match &iface.name {
-            Some(n) => if nl80211::parse_string(&n) == interface_name {
-                return Some(iface)
-            },
-            _ => ()
+        if let Some(n) = &iface.name {
+            if nl80211::parse_string(&n).as_str().trim_matches('\u{0}') == interface_name {
+                return Some(iface);
+            }
         }
     }
 
@@ -191,10 +182,11 @@ const SIGNAL_MAX_DBM: i32 = -30;
 const NOISE_FLOOR_DBM: i32 = -80;
 
 // thank u to i3status and NetworkManager :)
-fn dbm_to_percentage(mut dbm: i32) -> f32 {
-    dbm = dbm.max(NOISE_FLOOR_DBM).min(SIGNAL_MAX_DBM);
+fn dbm_to_percentage(mut dbm: i8) -> i32 {
+    dbm = dbm.max(NOISE_FLOOR_DBM as i8).min(SIGNAL_MAX_DBM as i8);
+    let dbm_f = dbm as f64;
 
-    -0.04 * ((dbm + 30) * (dbm + 30) + 100) as f32
+    (-0.04 * ((dbm_f + 30.0) * (dbm_f + 30.0) + 100.0)) as i32
 }
 
 fn get_icon(signal_strength_percent: i32, status: &NetworkStatus) -> char {

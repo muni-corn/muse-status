@@ -108,6 +108,7 @@ pub fn interpolate_colors(first: &RGBA, second: &RGBA, interpolation: f32) -> RG
     }
 }
 
+#[derive(Debug)]
 pub enum RGBAParseError {
     BadString(String),
     IntParse(std::num::ParseIntError),
