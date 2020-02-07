@@ -1,14 +1,14 @@
 use crate::errors::*;
 use crate::format;
-use crate::format::blocks::Block;
 use crate::format::blocks::output::BlockOutput;
+use crate::format::blocks::Block;
+use std::io::Write;
 use std::net::{TcpListener, TcpStream};
+use std::sync::mpsc;
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
-use std::sync::mpsc::{Sender, Receiver};
-use std::sync::{Arc, Mutex};
-use std::io::Write;
-use std::sync::mpsc;
 
 /// A daemon for muse-status. The daemon handles the logic of blocks as a server. Any connected
 /// clients are sent the formatted status output.
@@ -24,9 +24,7 @@ type DaemonArc = Arc<Mutex<Daemon>>;
 
 impl Daemon {
     /// Creates a new Daemon that runs at the specified address.
-    pub fn new(
-        addr: &str,
-    ) -> Self {
+    pub fn new(addr: &str) -> Self {
         Daemon {
             addr: addr.to_string(),
             connections: Vec::new(),
@@ -39,7 +37,8 @@ impl Daemon {
     /// Starts the Daemon with the given blocks by running many asynchronous threads. If starting
     /// is successful, this function will return a Vec of JoinHandles, which are to be used by
     /// the calling function.
-    pub fn start(mut self, 
+    pub fn start(
+        mut self,
         formatter: format::Formatter,
         primary_blocks: Vec<Box<dyn Block>>,
         secondary_blocks: Vec<Box<dyn Block>>,
@@ -56,20 +55,27 @@ impl Daemon {
 
         // accept connections and handle them, asynchronously
         let data_clone = daemon_arc_mutex.clone();
-        thread_handles.push(thread::spawn(move || Self::accept_connections(data_clone, &listener)));
+        thread_handles.push(thread::spawn(move || {
+            Self::accept_connections(data_clone, &listener)
+        }));
 
         // listen for block outputs
         let data_clone = daemon_arc_mutex.clone();
-        thread_handles.push(thread::spawn(move || Self::listen_to_blocks(data_clone, block_rx)));
+        thread_handles.push(thread::spawn(move || {
+            Self::listen_to_blocks(data_clone, block_rx)
+        }));
 
         // listen for banners
         let data_clone = daemon_arc_mutex.clone();
-        thread_handles.push(thread::spawn(move || Self::listen_for_banners(data_clone, banner_rx)));
+        thread_handles.push(thread::spawn(move || {
+            Self::listen_for_banners(data_clone, banner_rx)
+        }));
 
         // thread::spawn(self.listen_for_xorg_changes());
 
         // start status blocks
-        let (mut block_handles, update_request_senders) = Self::start_all_blocks(block_tx, primary_blocks, secondary_blocks, ternary_blocks);
+        let (mut block_handles, update_request_senders) =
+            Self::start_all_blocks(block_tx, primary_blocks, secondary_blocks, ternary_blocks);
         daemon_arc_mutex.lock().unwrap().notify_senders = update_request_senders;
         thread_handles.append(&mut block_handles);
 
@@ -103,9 +109,9 @@ impl Daemon {
     fn accept_connections(daemon_arc: DaemonArc, listener: &TcpListener) {
         for result in listener.incoming() {
             match result {
-                Ok(conn) => { 
-                    let _ = daemon_arc.lock().unwrap().handle_connection(conn); 
-                },
+                Ok(conn) => {
+                    let _ = daemon_arc.lock().unwrap().handle_connection(conn);
+                }
                 Err(e) => panic!(e),
             }
         }
@@ -113,15 +119,19 @@ impl Daemon {
 
     /// Shound be run within a separate thread.
     fn listen_to_blocks(daemon_arc: DaemonArc, block_rx: Receiver<BlockOutput>) {
-        loop {
-            if let Ok(b) = block_rx.recv() { daemon_arc.lock().unwrap().formatter.update(b.block_name, b.body) }
+        while let Ok(b) = block_rx.recv() {
+            daemon_arc
+                .lock()
+                .unwrap()
+                .formatter
+                .update(b.block_name, b.body)
         }
     }
 
     /// Shound be run within a separate thread.
     fn listen_for_banners(daemon_arc: DaemonArc, banner_rx: Receiver<format::Banner>) {
-        loop {
-            if let Ok(b) = banner_rx.recv() { daemon_arc.lock().unwrap().formatter.banner(b) }
+        while let Ok(b) = banner_rx.recv() {
+            daemon_arc.lock().unwrap().formatter.banner(b)
         }
     }
 
@@ -136,9 +146,9 @@ impl Daemon {
                 _ => {
                     return Err(BasicError {
                         message: format!(
-                                     "muse-status doesn't understand this command: {}",
-                                     subcommand
-                                 ),
+                            "muse-status doesn't understand this command: {}",
+                            subcommand
+                        ),
                     })
                 }
             }

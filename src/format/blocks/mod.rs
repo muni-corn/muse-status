@@ -22,7 +22,10 @@ pub trait Block: Send {
     fn run(
         self: Box<Self>,
         block_sender: Sender<BlockOutput>,
-    ) -> (Vec<JoinHandle<()>>, Sender<String>) where Self: 'static {
+    ) -> (Vec<JoinHandle<()>>, Sender<String>)
+    where
+        Self: 'static,
+    {
         let (notify_tx, notify_rx) = mpsc::channel::<String>();
 
         // make arcs and mutexes
@@ -37,6 +40,7 @@ pub trait Block: Send {
                 let mut block = block_arc_mutex.lock().unwrap();
 
                 // update and update the bar
+                println!("updating `{}` block", block.name());
                 let _ = block.update();
                 let _ = block_sender.send(BlockOutput::new(block.name(), block.output()));
 
@@ -45,14 +49,15 @@ pub trait Block: Send {
 
             let now = chrono::Local::now();
             if let Some(d) = next_update_time {
-                thread::sleep((d - now).to_std().unwrap());
+                let duration = (d - now).to_std().unwrap();
+                thread::sleep(duration);
             } else {
-                return;
+                break;
             }
         });
 
-        let notify_listen_handle = thread::spawn(move || loop {
-            if let Ok(name) = notify_rx.recv() {
+        let notify_listen_handle = thread::spawn(move || {
+            while let Ok(name) = notify_rx.recv() {
                 let mut block = arc_clone.lock().unwrap();
                 if name == block.name() {
                     let _ = block.update();
@@ -67,7 +72,7 @@ pub trait Block: Send {
     /// Sets the banner sender.
     fn set_banner_sender(&mut self, _banner_sender: Sender<format::Banner>) {}
 
-    /// Updates the block, returning an error if the update fails. 
+    /// Updates the block, returning an error if the update fails.
     fn update(&mut self) -> Result<(), UpdateError>;
 
     /// The next time at which the block will update, if any. If None, the block will immediately

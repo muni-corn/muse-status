@@ -1,21 +1,21 @@
-use crate::format::blocks::Block;
-use crate::format::blocks::output::{BlockOutput, BlockOutputBody};
-use std::thread::JoinHandle;
-use std::thread;
-use std::sync::mpsc::Sender;
 use crate::errors::*;
+use crate::format::blocks::output::{BlockOutput, BlockOutputBody};
+use crate::format::blocks::Block;
+use std::sync::mpsc::Sender;
+use std::thread;
+use std::thread::JoinHandle;
 
 const PLAYING_ICON: char = '\u{f387}';
 const PAUSED_ICON: char = '\u{f3e4}';
 
 pub struct MprisBlock {
-    next_update_time: chrono::DateTime<chrono::Local>
+    next_update_time: chrono::DateTime<chrono::Local>,
 }
 
 impl Default for MprisBlock {
     fn default() -> Self {
         MprisBlock {
-            next_update_time: chrono::Local::now() + chrono::Duration::seconds(5)
+            next_update_time: chrono::Local::now() + chrono::Duration::seconds(5),
         }
     }
 }
@@ -27,11 +27,13 @@ impl MprisBlock {
 }
 
 impl Block for MprisBlock {
-    fn run(mut self: Box<Self>, block_sender: Sender<BlockOutput>) -> (Vec<JoinHandle<()>>, Sender<String>) {
+    fn run(
+        mut self: Box<Self>,
+        block_sender: Sender<BlockOutput>,
+    ) -> (Vec<JoinHandle<()>>, Sender<String>) {
         let (notify_tx, notify_rx) = std::sync::mpsc::channel::<String>();
 
-        let find_players_handle = thread::spawn(move || loop {
-        });
+        let find_players_handle = thread::spawn(move || loop {});
 
         let sender_clone = block_sender.clone();
         let listen_notify_handle = thread::spawn(move || {

@@ -1,9 +1,9 @@
-use chrono::{DateTime, Local};
-use crate::format::Attention;
-use crate::format::blocks::*;
-use crate::format::blocks::output::*;
 use crate::errors::*;
+use crate::format::blocks::output::*;
+use crate::format::blocks::*;
+use crate::format::Attention;
 use chrono::prelude::*;
+use chrono::{DateTime, Local};
 
 const TIME_FORMAT: &str = "%-I:%M %P";
 const DATE_FORMAT: &str = "%a, %b %-d";
@@ -36,7 +36,9 @@ impl Block for DateBlock {
     /// Updates the clock
     fn update(&mut self) -> Result<(), UpdateError> {
         self.now = chrono::Local::now();
-        self.next_update = (self.now + chrono::Duration::minutes(1)).with_second(0).unwrap();
+        self.next_update = (self.now + chrono::Duration::minutes(1))
+            .with_second(0)
+            .unwrap();
 
         Ok(())
     }
@@ -54,7 +56,7 @@ impl Block for DateBlock {
             icon: Some(ICON),
             primary_text: format!("{}", self.now.format(TIME_FORMAT)),
             secondary_text: Some(format!("{}", self.now.format(DATE_FORMAT))),
-            attention: Attention::Normal
+            attention: Attention::Normal,
         }))
     }
 }

@@ -1,6 +1,6 @@
 use crate::errors::*;
-use crate::format::blocks::*;
 use crate::format::blocks::output::*;
+use crate::format::blocks::*;
 use crate::format::Attention;
 use chrono::{DateTime, Duration, Local};
 use std::path::PathBuf;
@@ -31,7 +31,7 @@ impl ChargeStatus {
 }
 
 struct ParseChargeStatusError {
-    context: String
+    context: String,
 }
 
 #[derive(Clone)]
@@ -64,11 +64,8 @@ pub struct SmartBatteryBlock {
 }
 
 impl SmartBatteryBlock {
-    pub fn new(
-        battery_dir: &str,
-        warning_level: i32,
-        alarm_level: i32,
-    ) -> Self {
+    /// Returns a new block with the specified battery, warning level, and alarm level..
+    pub fn new(battery_dir: &str, warning_level: i32, alarm_level: i32) -> Self {
         let battery = String::from(battery_dir);
         let next_update_time = Local::now() + Duration::minutes(1);
         Self {
@@ -118,7 +115,7 @@ impl SmartBatteryBlock {
                         }
                     }
                 }
-                _ => () // do nothing on any other status
+                _ => (), // do nothing on any other status
             }
         }
     }
@@ -233,9 +230,9 @@ impl Block for SmartBatteryBlock {
                                 };
 
                                 Some(format!(
-                                        "{} {}",
-                                        prefix,
-                                        completion_time.format(TIME_FORMAT)
+                                    "{} {}",
+                                    prefix,
+                                    completion_time.format(TIME_FORMAT)
                                 ))
                             } else {
                                 None
@@ -260,8 +257,8 @@ impl Block for SmartBatteryBlock {
                             } else {
                                 Attention::Normal
                             }
-                        },
-                        _ => Attention::Normal
+                        }
+                        _ => Attention::Normal,
                     }
                 } else {
                     Attention::Normal
@@ -311,10 +308,11 @@ impl Block for SmartBatteryBlock {
                         if current_read.status != last_read.status || self.last_read.is_none() {
                         } else if current_read.at - last_read.at >= Duration::seconds(5)
                             && current_read.charge - last_read.charge != 0
-                                && (current_read.status == ChargeStatus::Charging
-                                    || current_read.status == ChargeStatus::Discharging)
+                            && (current_read.status == ChargeStatus::Charging
+                                || current_read.status == ChargeStatus::Discharging)
                         {
-                            let time_diff_ns: i64 = (current_read.at - last_read.at).num_nanoseconds().unwrap();
+                            let time_diff_ns: i64 =
+                                (current_read.at - last_read.at).num_nanoseconds().unwrap();
                             let charge_diff: i64 = (current_read.charge - last_read.charge).into();
 
                             // calculate new rate in nanoseconds per charge unit
@@ -360,21 +358,21 @@ const UNKNOWN_ICON: char = '\u{f590}';
 fn get_battery_icon(status: &ChargeStatus, percentage: i32) -> char {
     match status {
         ChargeStatus::Charging => {
-            let charging_index = ((percentage * CHARGING_ICONS.len() as i32 / 100) as usize).min(CHARGING_ICONS.len() - 1);
+            let charging_index = ((percentage * CHARGING_ICONS.len() as i32 / 100) as usize)
+                .min(CHARGING_ICONS.len() - 1);
             CHARGING_ICONS[charging_index as usize]
         }
         ChargeStatus::Discharging => {
-            let discharging_index = ((percentage * DISCHARGING_ICONS.len() as i32 / 100) as usize).min(DISCHARGING_ICONS.len() - 1);
+            let discharging_index = ((percentage * DISCHARGING_ICONS.len() as i32 / 100) as usize)
+                .min(DISCHARGING_ICONS.len() - 1);
             DISCHARGING_ICONS[discharging_index as usize]
         }
         ChargeStatus::Full => {
             // no display if full (return space character; found that returning the null character
             // terminates i3bar's json and will cause a problem
             ' '
-        },
-        _ => {
-            UNKNOWN_ICON
         }
+        _ => UNKNOWN_ICON,
     }
 }
 
@@ -390,9 +388,9 @@ fn get_time_remaining_string(status: ChargeStatus, time_done: DateTime<Local>) -
         };
 
         Some(format!(
-                "{} {}",
-                time_string_prefix,
-                time_done.format(TIME_FORMAT)
+            "{} {}",
+            time_string_prefix,
+            time_done.format(TIME_FORMAT)
         ))
     } else {
         None
@@ -401,53 +399,53 @@ fn get_time_remaining_string(status: ChargeStatus, time_done: DateTime<Local>) -
 
 /*  DATA FILE FORMAT
 
-    data recorded like so:
-    key %/hour records
+data recorded like so:
+key %/hour records
 
-    where "records" is the amount of times the parameter has been recorded.
-    used for recording a new average based on the current average and how
-    many times the parameter has been recorded before
-    for example:
+where "records" is the amount of times the parameter has been recorded.
+used for recording a new average based on the current average and how
+many times the parameter has been recorded before
+for example:
 
-    C 3.14159 200
+C 3.14159 200
 
-    --- BEGIN FILE EXAMPLE ------------------------------------------------
+--- BEGIN FILE EXAMPLE ------------------------------------------------
 
-    C			// charging avg
-    C0			|
-    C1  		|
-    C2			| charging values by percentage
-    ...			|
-    C9			|
+C			// charging avg
+C0			|
+C1  		|
+C2			| charging values by percentage
+...			|
+C9			|
 
-    D			// discharging avg
-    D0			|
-    D1			|
-    D2			| discharging avg values by hour of day
-    ...			| (used for predicting nonexistent day-by-day values)
-    D23			|
+D			// discharging avg
+D0			|
+D1			|
+D2			| discharging avg values by hour of day
+...			| (used for predicting nonexistent day-by-day values)
+D23			|
 
-    S0			| sunday
-    S1			|
-    S2			| discharging values by hour by day of week
-    ...			|
-    S23			|
+S0			| sunday
+S1			|
+S2			| discharging values by hour by day of week
+...			|
+S23			|
 
-    M0			// monday
-    ...
+M0			// monday
+...
 
-    T0			// thursday
-    ...
+T0			// thursday
+...
 
-    W0			// wednesday
-    ...
+W0			// wednesday
+...
 
-    R0			// thursday
-    ...
+R0			// thursday
+...
 
-    F0			// friday
-    ...
+F0			// friday
+...
 
-    A0			// saturday
-    ...
-    */
+A0			// saturday
+...
+*/
