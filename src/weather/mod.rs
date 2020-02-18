@@ -7,6 +7,7 @@ use crate::format::Attention;
 use chrono::Local;
 use std::collections::HashMap;
 use structs::*;
+use std::fmt;
 
 const IP_STACK_KEY: &str = "9c237911bdacce2e8c9a021d9b4c1317";
 
@@ -15,17 +16,17 @@ enum Units {
     Metric,
 }
 
-impl Units {
-    fn to_string(&self) -> String {
-        let s = match self {
-            Self::Imperial => "imperial",
-            Self::Metric => "metric",
-        };
-
-        String::from(s)
+impl fmt::Display for Units {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Imperial => write!(f, "imperial"),
+            Self::Metric => write!(f, "metric"),
+        }
     }
 }
 
+/// WeatherBlock returns information about the weather around the user's current location.
+/// OpenWeatherMap and IPStack are used for weather and location respectively.
 pub struct WeatherBlock {
     openweathermap_key: String,
     current_report: Option<FullWeatherReport>,
@@ -94,7 +95,7 @@ impl WeatherBlock {
         w
     }
 
-    fn get_location() -> Result<WeatherLocation, MuseStatusError> {
+    fn get_current_location() -> Result<WeatherLocation, MuseStatusError> {
         let ip = get_external_ip()?;
 
         let url = format!(
@@ -112,18 +113,18 @@ impl WeatherBlock {
         }
     }
 
-    pub fn get_weather_icon(&self, report: &FullWeatherReport) -> char {
+    fn get_weather_icon(&self, report: &FullWeatherReport) -> char {
         if let Some(r) = report.weather.get(0) {
             let icon_string = &r.icon;
             self.weather_icons[icon_string]
         } else {
-            ' '
+            self.default_icon
         }
     }
 
-    pub fn update_current_report(&mut self) -> Result<(), UpdateError> {
+    fn update_current_report(&mut self) -> Result<(), UpdateError> {
         if self.location.is_none() {
-            self.location = match Self::get_location() {
+            self.location = match Self::get_current_location() {
                 Ok(l) => Some(l),
                 Err(e) => {
                     return Err(UpdateError {
@@ -234,8 +235,8 @@ impl Block for WeatherBlock {
         if let Some(r) = &self.current_report {
             Some(BlockOutputBody::from(NiceOutput {
                 attention: Attention::Normal,
-                icon: Some(self.get_weather_icon(r)),
-                primary_text: self.get_temperature_string().unwrap_or("".to_string()),
+                icon: self.get_weather_icon(r),
+                primary_text: self.get_temperature_string().unwrap_or_else(|| "".to_string()),
                 secondary_text: self.get_weather_description(),
             }))
         } else {
@@ -248,6 +249,8 @@ impl Block for WeatherBlock {
     }
 }
 
+/// Returns the external, public IP address of this device. The address is used to find the
+/// device's current location.
 pub fn get_external_ip() -> Result<String, MuseStatusError> {
     Ok(reqwest::blocking::get("http://checkip.amazonaws.com")?.text()?)
 }

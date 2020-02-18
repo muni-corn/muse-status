@@ -1,3 +1,4 @@
+/// A module for block outputs.
 pub mod output;
 
 use crate::errors::UpdateError;
@@ -29,19 +30,22 @@ pub trait Block: Send {
         let (notify_tx, notify_rx) = mpsc::channel::<String>();
 
         // make arcs and mutexes
+        let loop_thread_name = format!("{} update loop", self.name());
+        let notify_listener_thread_name = format!("{} notify listening thread", self.name());
         let block_arc_mutex = Arc::new(Mutex::new(self));
         let arc_clone = block_arc_mutex.clone();
 
         // clone the sender
         let sender_clone = block_sender.clone();
 
-        let loop_handle = thread::spawn(move || loop {
+        let loop_handle = thread::Builder::new().name(loop_thread_name).spawn(move || loop {
             let next_update_time = {
                 let mut block = block_arc_mutex.lock().unwrap();
 
                 // update and update the bar
-                println!("updating `{}` block", block.name());
-                let _ = block.update();
+                if let Err(e) = block.update() {
+                    println!("{}", e)
+                }
                 let _ = block_sender.send(BlockOutput::new(block.name(), block.output()));
 
                 block.next_update_time()
@@ -54,9 +58,9 @@ pub trait Block: Send {
             } else {
                 break;
             }
-        });
+        }).unwrap();
 
-        let notify_listen_handle = thread::spawn(move || {
+        let notify_listen_handle = thread::Builder::new().name(notify_listener_thread_name).spawn(move || {
             while let Ok(name) = notify_rx.recv() {
                 let mut block = arc_clone.lock().unwrap();
                 if name == block.name() {
@@ -64,7 +68,7 @@ pub trait Block: Send {
                     let _ = sender_clone.send(BlockOutput::new(block.name(), block.output()));
                 }
             }
-        });
+        }).unwrap();
 
         (vec![loop_handle, notify_listen_handle], notify_tx)
     }
