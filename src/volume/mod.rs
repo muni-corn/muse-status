@@ -1,6 +1,7 @@
 use crate::errors::*;
-use crate::format::blocks::output::BlockOutputBody;
-use crate::format::blocks::*;
+use crate::format::blocks::output::{BlockOutputBody, NiceOutput};
+use crate::format::blocks::Block;
+use crate::format::Attention;
 use std::process;
 
 /// VolumeBlock provides information for the system's audio volume. Requires `amixer`.
@@ -39,11 +40,12 @@ impl Block for VolumeBlock {
     }
 
     fn output(&self) -> Option<BlockOutputBody> {
-        Some(BlockOutputBody::Custom(format!(
-            "{}  {}%",
-            get_icon(self.current_volume),
-            self.current_volume
-        )))
+        Some(BlockOutputBody::Nice(NiceOutput {
+            icon: get_icon(self.current_volume),
+            primary_text: format!("{}%", self.current_volume),
+            secondary_text: None,
+            attention: Attention::Dim,
+        }))
     }
 }
 
@@ -58,17 +60,18 @@ fn get_current_volume() -> Result<i32, UpdateError> {
         .output()
         .unwrap();
     let info = String::from_utf8(output.stdout).unwrap();
+    let last_line = info.lines().last().unwrap();
 
-    match info.lines().last().unwrap().chars().position(|c| c == '[') {
+    match last_line.chars().position(|c| c == '[') {
         Some(i) => {
             // filters out any non-digit characters past the first opening bracket to parse the
             // volume amount
-            Ok(info[i..]
-                .chars()
+            let line_end = &last_line[i..];
+            let raw = line_end.chars()
                 .filter(|c| c.is_digit(10))
-                .collect::<String>()
-                .parse::<i32>()
-                .unwrap())
+                .collect::<String>();
+
+            Ok(raw.parse::<i32>().unwrap())
         }
         None => Err(UpdateError {
             block_name: String::from("volume"),

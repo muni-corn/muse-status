@@ -5,11 +5,19 @@ use crate::format::Attention;
 use chrono::{DateTime, Duration, Local};
 use std::path::PathBuf;
 
+/// The status of a battery.
 #[derive(Clone, PartialEq)]
 pub enum ChargeStatus {
+    /// The battery is discharging.
     Discharging,
+
+    /// The battery is charging.
     Charging,
+
+    /// The status of the battery isn't known.
     Unknown,
+
+    /// The battery is full and charging.
     Full,
 }
 
@@ -28,10 +36,6 @@ impl ChargeStatus {
             _ => Self::Unknown,
         }
     }
-}
-
-struct ParseChargeStatusError {
-    context: String,
 }
 
 #[derive(Clone)]
@@ -55,8 +59,10 @@ pub struct SmartBatteryBlock {
 
     charging_reads_since_last_anchor: i32,
     average_charging_rate: f32,
+
     discharging_reads_since_last_anchor: i32,
     average_discharging_rate: f32,
+
     current_read: Option<BatteryRead>,
     last_read: Option<BatteryRead>,
 
@@ -138,7 +144,7 @@ impl SmartBatteryBlock {
             },
         };
 
-        Ok(raw.parse()?)
+        Ok(raw.trim().parse()?)
     }
 
     // XXX This function is a copy-and-paste of Self::get_batttery_charge. consider writing a
@@ -153,16 +159,9 @@ impl SmartBatteryBlock {
             },
         };
 
-        self.charge_full = raw.parse()?;
+        self.charge_full = raw.trim().parse()?;
 
         Ok(())
-    }
-
-    fn get_battery_percentage(&self) -> Option<i32> {
-        match &self.current_read {
-            Some(r) => Some(r.charge * 100 / self.charge_full),
-            None => None,
-        }
     }
 
     fn get_battery_status(&self) -> Result<ChargeStatus, MuseStatusError> {
@@ -208,43 +207,50 @@ impl Block for SmartBatteryBlock {
     }
 
     fn output(&self) -> Option<BlockOutputBody> {
-        match self.get_battery_percentage() {
-            Some(percent) => {
+        match &self.current_read {
+            Some(current_read) => {
                 let now = Local::now();
+                let percent = current_read.charge * 100 / self.charge_full;
 
-                let primary_text = format!("{}%", percent);
+                let primary_text = match current_read.status {
+                    ChargeStatus::Full => String::from("Full"),
+                    _ => format!("{}%", percent)
+                };
 
-                let secondary_text = match self.get_completion_time() {
-                    Some(completion_time) => {
-                        if completion_time < now {
-                            None
-                        } else {
-                            let duration_left = completion_time - now;
-                            if duration_left <= Duration::minutes(30) {
-                                Some(format!("{} min left", duration_left.num_minutes()))
-                            } else if let Some(r) = &self.current_read {
-                                let prefix = match &r.status {
-                                    ChargeStatus::Charging => "Full at",
-                                    ChargeStatus::Discharging => "Until",
-                                    _ => "",
-                                };
+                let secondary_text = match current_read.status {
+                    ChargeStatus::Full => Some(String::from("Plugged in")),
+                    _ => {
+                        match self.get_completion_time() {
+                            Some(completion_time) => {
+                                if completion_time < now {
+                                    None
+                                } else {
+                                    let duration_left = completion_time - now;
+                                    if duration_left <= Duration::minutes(30) {
+                                        Some(format!("{} min left", duration_left.num_minutes()))
+                                    } else {
+                                        let prefix = match &current_read.status {
+                                            ChargeStatus::Charging => "Full at",
+                                            ChargeStatus::Discharging => "Until",
+                                            _ => "",
+                                        };
 
-                                Some(format!(
-                                    "{} {}",
-                                    prefix,
-                                    completion_time.format(TIME_FORMAT)
-                                ))
-                            } else {
-                                None
+                                        Some(format!(
+                                                "{} {}",
+                                                prefix,
+                                                completion_time.format(TIME_FORMAT)
+                                        ))
+                                    } 
+                                }
                             }
+                            None => None,
                         }
                     }
-                    None => None,
                 };
 
                 let icon = match &self.current_read {
-                    Some(r) => Some(get_battery_icon(&r.status, percent)),
-                    None => None,
+                    Some(r) => get_battery_icon(&r.status, percent),
+                    None => ' ',
                 };
 
                 let attention = if let Some(r) = &self.current_read {
@@ -270,8 +276,8 @@ impl Block for SmartBatteryBlock {
                     icon,
                     attention,
                 }))
-            }
-            None => None,
+            },
+            None => None
         }
     }
 
@@ -308,8 +314,8 @@ impl Block for SmartBatteryBlock {
                         if current_read.status != last_read.status || self.last_read.is_none() {
                         } else if current_read.at - last_read.at >= Duration::seconds(5)
                             && current_read.charge - last_read.charge != 0
-                            && (current_read.status == ChargeStatus::Charging
-                                || current_read.status == ChargeStatus::Discharging)
+                                && (current_read.status == ChargeStatus::Charging
+                                    || current_read.status == ChargeStatus::Discharging)
                         {
                             let time_diff_ns: i64 =
                                 (current_read.at - last_read.at).num_nanoseconds().unwrap();
@@ -352,6 +358,7 @@ const CHARGING_ICONS: [char; 11] = [
     '\u{f89e}', '\u{f89b}', '\u{f086}', '\u{f087}', '\u{f088}', '\u{f89c}', '\u{f089}', '\u{f89d}',
     '\u{f08a}', '\u{f08b}', '\u{f085}',
 ];
+const FULL_ICON: char = '\u{f084}';
 const UNKNOWN_ICON: char = '\u{f590}';
 
 // returns a battery icon
@@ -368,84 +375,61 @@ fn get_battery_icon(status: &ChargeStatus, percentage: i32) -> char {
             DISCHARGING_ICONS[discharging_index as usize]
         }
         ChargeStatus::Full => {
-            // no display if full (return space character; found that returning the null character
-            // terminates i3bar's json and will cause a problem
-            ' '
+            FULL_ICON
         }
         _ => UNKNOWN_ICON,
     }
 }
 
-// formats a string telling at which time the battery will be empty/full
-// e.g. "full at 3:30 pm"
-fn get_time_remaining_string(status: ChargeStatus, time_done: DateTime<Local>) -> Option<String> {
-    if status == ChargeStatus::Charging || status == ChargeStatus::Discharging {
-        // get the time string prefix
-        let time_string_prefix = if status == ChargeStatus::Charging {
-            "full at "
-        } else {
-            "until "
-        };
-
-        Some(format!(
-            "{} {}",
-            time_string_prefix,
-            time_done.format(TIME_FORMAT)
-        ))
-    } else {
-        None
-    }
-}
-
 /*  DATA FILE FORMAT
 
-data recorded like so:
-key %/hour records
+    data recorded like so:
+    key %/hour records
 
-where "records" is the amount of times the parameter has been recorded.
-used for recording a new average based on the current average and how
-many times the parameter has been recorded before
-for example:
+    where "records" is the amount of times the parameter has been recorded.
+    used for recording a new average based on the current average and how
+    many times the parameter has been recorded before
+    for example:
 
-C 3.14159 200
+    C 3.14159 200
 
---- BEGIN FILE EXAMPLE ------------------------------------------------
+    --- BEGIN FILE EXAMPLE ------------------------------------------------
 
-C			// charging avg
-C0			|
-C1  		|
-C2			| charging values by percentage
-...			|
-C9			|
+    C			| charging avg
+    C0			|
+    C1  		        |
+    C2			| charging values by percentage
+    ...			|
+    C9			|
 
-D			// discharging avg
-D0			|
-D1			|
-D2			| discharging avg values by hour of day
-...			| (used for predicting nonexistent day-by-day values)
-D23			|
+    D			| discharging avg
+    D0			|
+    D1			|
+    D2			| discharging avg values by hour of day
+    ...			| (used for predicting nonexistent day-by-day values)
+    D23			|
 
-S0			| sunday
-S1			|
-S2			| discharging values by hour by day of week
-...			|
-S23			|
+    S0			| sunday
+    S1			|
+    S2			| discharging values by hour by day of week
+    ...			|
+    S23			|
 
-M0			// monday
-...
+    M0			| monday
+    ...                     |
 
-T0			// thursday
-...
+    T0			| thursday
+    ...                     |
 
-W0			// wednesday
-...
+    W0			| wednesday
+    ...                     |
 
-R0			// thursday
-...
+    R0			| thursday
+    ...                     |
 
-F0			// friday
-...
+    F0			| friday
+    ...                     |
 
-A0			// saturday
-...
-*/
+    A0			| saturday
+    ...                     |
+    */

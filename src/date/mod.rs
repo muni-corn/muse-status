@@ -9,7 +9,7 @@ const TIME_FORMAT: &str = "%-I:%M %P";
 const DATE_FORMAT: &str = "%a, %b %-d";
 const ICON: char = '\u{f150}';
 
-// Block is a block that transmits time and date data
+/// Transmits time and date data.
 pub struct DateBlock {
     now: DateTime<Local>,
     next_update: DateTime<Local>,
@@ -27,6 +27,7 @@ impl Default for DateBlock {
 }
 
 impl DateBlock {
+    /// Returns a new DateBlock.
     pub fn new() -> Self {
         Default::default()
     }
@@ -53,7 +54,7 @@ impl Block for DateBlock {
 
     fn output(&self) -> Option<BlockOutputBody> {
         Some(BlockOutputBody::from(NiceOutput {
-            icon: Some(ICON),
+            icon: ICON,
             primary_text: format!("{}", self.now.format(TIME_FORMAT)),
             secondary_text: Some(format!("{}", self.now.format(DATE_FORMAT))),
             attention: Attention::Normal,

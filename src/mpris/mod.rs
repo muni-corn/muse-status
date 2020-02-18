@@ -1,55 +1,136 @@
 use crate::errors::*;
-use crate::format::blocks::output::{BlockOutput, BlockOutputBody};
+use crate::format::blocks::output::{BlockOutput, BlockOutputBody, NiceOutput};
 use crate::format::blocks::Block;
+use crate::format::Attention;
 use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
+use mpris as mpris_lib;
 
-const PLAYING_ICON: char = '\u{f387}';
-const PAUSED_ICON: char = '\u{f3e4}';
 
+/// A block that displays information about any media currently playing on the device. 
 pub struct MprisBlock {
     next_update_time: chrono::DateTime<chrono::Local>,
+
+    playing_icon: char,
+    paused_icon: char,
+
+    status: PlayerStatus,
+    title: Option<String>,
+    artist: Option<String>,
 }
 
 impl Default for MprisBlock {
     fn default() -> Self {
         MprisBlock {
             next_update_time: chrono::Local::now() + chrono::Duration::seconds(5),
+            playing_icon: '\u{f387}',
+            paused_icon: '\u{f3e4}',
+
+            status: PlayerStatus::Stopped,
+            title: None,
+            artist: None,
         }
     }
 }
 
 impl MprisBlock {
+    /// Returns a new MprisBlock.
     pub fn new() -> Self {
         Default::default()
+    }
+
+    fn get_icon(&self) -> char {
+        match self.status {
+            PlayerStatus::Playing => self.playing_icon,
+            PlayerStatus::Paused => self.paused_icon,
+            PlayerStatus::Stopped => self.paused_icon,
+        }
+    }
+
+    fn set_metadata(&mut self, metadata: mpris::Metadata) {
+        self.title = if let Some(t) = metadata.title() {
+            Some(String::from(t))
+        } else {
+            None
+        };
+
+        self.artist = if let Some(av) = metadata.album_artists() {
+            Some(av[0].clone())
+        } else {
+            None
+        };
     }
 }
 
 impl Block for MprisBlock {
     fn run(
-        mut self: Box<Self>,
+        self: Box<Self>,
         block_sender: Sender<BlockOutput>,
     ) -> (Vec<JoinHandle<()>>, Sender<String>) {
-        let (notify_tx, notify_rx) = std::sync::mpsc::channel::<String>();
+        // This might seem dumb, but MprisBlock updates are dependent on updates from the mpris
+        // client, so it will not listen to any "notify" requests
+        let (notify_tx, _) = std::sync::mpsc::channel::<String>();
 
-        let find_players_handle = thread::spawn(move || loop {});
+        let mutex = Arc::new(Mutex::new(self));
+        let player_listen_handle = thread::Builder::new().name(String::from("mpris player listener")).spawn(move || loop {
+            let player = loop {
+                thread::sleep(std::time::Duration::from_secs(5));
 
-        let sender_clone = block_sender.clone();
-        let listen_notify_handle = thread::spawn(move || {
-            while let Ok(s) = notify_rx.recv() {
-                if s == self.name() {
-                    self.update().unwrap();
-                    sender_clone.send(BlockOutput::new(self.name(), self.output()));
+                println!("trying to find player");
+                if let Ok(player_finder) = mpris_lib::PlayerFinder::new() {
+                    if let Ok(player) = player_finder.find_active() {
+                        break player
+                    }
+                }
+            };
+
+            {
+                let metadata = player.get_metadata().unwrap();
+                let mut block = mutex.lock().unwrap();
+                block.set_metadata(metadata);
+                block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
+            }
+
+            println!("found player: {:?}", player);
+
+            if let Ok(mut events) = player.events() {
+                println!("got event");
+                while let Some(Ok(e)) = events.next() {
+                    println!("got some ok event");
+                    // update the player data, then send the update
+                    let mut block = mutex.lock().unwrap();
+
+                    match e {
+                        // update the block depending on the Event
+                        mpris_lib::Event::Playing => block.status = PlayerStatus::Playing,
+                        mpris_lib::Event::Paused => block.status = PlayerStatus::Paused,
+                        mpris_lib::Event::Stopped | mpris_lib::Event::PlayerShutDown => block.status = PlayerStatus::Stopped,
+                        mpris_lib::Event::TrackChanged(m) => block.set_metadata(m),
+                        _ => (),
+                    }
+
+                    block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
                 }
             }
-        });
 
-        (vec![find_players_handle, listen_notify_handle], notify_tx)
+            println!("events loop broken");
+
+            {
+                let mut block = mutex.lock().unwrap();
+                block.status = PlayerStatus::Stopped;
+                block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
+            }
+
+        }).unwrap();
+
+
+        (vec![player_listen_handle], notify_tx)
     }
 
     fn update(&mut self) -> Result<(), UpdateError> {
-        unimplemented!()
+        Ok(())
     }
 
     fn name(&self) -> &str {
@@ -61,12 +142,26 @@ impl Block for MprisBlock {
     }
 
     fn output(&self) -> Option<BlockOutputBody> {
-        unimplemented!()
+        match self.status {
+            PlayerStatus::Stopped => None,
+            _ => Some(BlockOutputBody::from(NiceOutput {
+                primary_text: self.title.clone().unwrap_or_else(String::new),
+                secondary_text: self.artist.clone(),
+                icon: self.get_icon(),
+                attention: Attention::Normal,
+            }))
+        }
     }
 }
 
+/// Represents the playing, paused, or stopped state of a player.
 pub enum PlayerStatus {
+    /// The player is playing. The play icon is shown.
     Playing,
+
+    /// The player is paused. The pause icon is shown.
     Paused,
+
+    /// The player is stopped. The block is hidden from the status bar.
     Stopped,
 }

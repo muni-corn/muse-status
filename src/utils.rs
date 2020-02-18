@@ -4,7 +4,7 @@ use crate::errors::*;
 
 /// Returns a number in a file
 pub fn get_int_from_file(filepath: &Path) -> Result<i32, MuseStatusError> {
-    Ok(fs::read_to_string(filepath)?.parse::<i32>()?)
+    Ok(fs::read_to_string(filepath)?.trim().parse::<i32>()?)
 }
 
 /// Returns the reuslt of a concave-down cubic function

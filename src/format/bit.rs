@@ -1,39 +1,43 @@
 use super::color::Color;
+use super::{Mode, Formatter};
 
+/// A sort of sub-block for easily creating output.
 pub struct Bit {
+    /// The text of the Bit.
     pub text: String,
+
+    /// The color of the Bit.
     pub color: Option<Color>,
+
+    /// The font of the Bit.
     pub font: Option<String>,
 }
 
-// impl Bit {
-//     pub fn as_lemonbar_string(&self) -> String {
-//         let mut s = self.text;
+impl Bit {
+    /// Formats the Bit for lemonbar ouptut.
+    pub fn as_lemonbar_string(&self, f: &Formatter) -> String {
+        if let Some(c) = &self.color {
+            let rgba = f.color_to_rgba(&c);
+            format!("%{{F#{}}}{}", rgba.hex_string(Mode::Lemonbar), self.text) // %{F#aabbccdd}text
+        } else {
+            self.text.clone()
+        }
+    }
 
-//         if let Some(c) = self.color {
-//             s = format!("%{{F#{}}}{}", c.hex_string(Mode::Lemonbar), self.text);
-//         }
-
-//         s
-//     }
-
-//     pub fn as_json_protocol_string(&self) -> String {
-//         match self.color {
-//             Some(c) => match self.font {
-//                 Some(f) => format!("<span color=\"#{}\" font=\"{}\">{}</span>", c.hex_string(Mode::JsonProtocol), f, self.text), // color and font
-//                 None => format!("<span color=\"#{}\">{}</span>", c.hex_string(Mode::JsonProtocol), self.text), // color, but no font
-//             },
-//             None => match self.font {
-//                 Some(f) => format!("<span font=\"{}\">{}</span>", f, self.text), // font, but no color
-//                 None => self.text.clone(), // no color and no font
-//             },
-//         }
-//     }
-
-//     pub fn from_mode(&self, mode: Mode) -> String {
-//         match mode {
-//             Mode::JsonProtocol => self.as_json_protocol_string(),
-//             Mode::Lemonbar => self.as_lemonbar_string(),
-//         }
-//     }
-// }
+    /// Formats the Bit as a pango string.
+    pub fn as_pango_string(&self, f: &Formatter) -> String {
+        match &self.color {
+            Some(c) => {
+                let rgba = f.color_to_rgba(&c);
+                match &self.font {
+                    Some(f) => format!("<span color=\"#{}\" font=\"{}\">{}</span>", rgba.hex_string(Mode::JsonProtocol), f, self.text), // color and font
+                    None => format!("<span color=\"#{}\">{}</span>", rgba.hex_string(Mode::JsonProtocol), self.text), // color, but no font
+                }
+            },
+            None => match &self.font {
+                Some(f) => format!("<span font=\"{}\">{}</span>", f, self.text), // font, but no color
+                None => self.text.clone(), // no color and no font
+            },
+        }
+    }
+}

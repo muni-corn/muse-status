@@ -32,11 +32,10 @@ impl BrightnessBlock {
     }
 
     fn update_max_brightness(&mut self) -> Result<(), UpdateError> {
-        self.max_brightness = match utils::get_int_from_file(
-            &PathBuf::from(BASE_DIR)
-                .join(&self.card)
-                .join("max_brightness"),
-        ) {
+        let path = &PathBuf::from(BASE_DIR)
+            .join(&self.card)
+            .join("max_brightness");
+        self.max_brightness = match utils::get_int_from_file(path) {
             Ok(b) => b,
             Err(e) => {
                 return Err(UpdateError {
@@ -51,7 +50,7 @@ impl BrightnessBlock {
 
     fn update_current_brightness(&mut self) -> Result<(), UpdateError> {
         self.current_brightness = match utils::get_int_from_file(
-            &PathBuf::from(BASE_DIR).join(&self.card).join("/brightness"),
+            &PathBuf::from(BASE_DIR).join(&self.card).join("brightness"),
         ) {
             Ok(b) => b,
             Err(e) => {

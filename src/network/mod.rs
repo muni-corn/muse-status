@@ -5,21 +5,50 @@ use crate::format::Attention;
 use chrono::{DateTime, Local};
 use nl80211::Socket;
 
-// Block is a block that transmits time and date data
+/// A block that transmits wireless interface data.
 pub struct NetworkBlock {
-    iface: nl80211::Interface,
+    iface_name: String,
+    iface: Option<nl80211::Interface>,
 
-    ssid: String,
+    ssid: Option<String>,
     strength_percent: i32,
     status: NetworkStatus,
 
-    dbm: i32,
+    connection_icons: Vec<char>,
+    packet_loss_icons: Vec<char>,
+    disconnected_icon: char,
+    disabled_icon: char,
 
     next_update_time: DateTime<Local>,
 }
 
+impl Default for NetworkBlock {
+    fn default() -> Self {
+        Self {
+            iface_name: String::new(),
+            iface: None,
+
+            ssid: None,
+            strength_percent: 0,
+            status: NetworkStatus::Disconnected,
+
+            connection_icons: vec!['\u{f92e}', '\u{f91e}', '\u{f921}', '\u{f924}', '\u{f927}'],
+            packet_loss_icons: vec!['\u{f92a}', '\u{f91f}', '\u{f922}', '\u{f925}', '\u{f928}'],
+            disconnected_icon: '\u{f92e}',
+            disabled_icon: '\u{f92d}',
+
+            next_update_time: Local::now(),
+        }
+    }
+}
+
 impl NetworkBlock {
-    pub fn new(iface: &str) -> Result<Self, MuseStatusError> {
+    /// Returns a new NetworkBlock.
+    pub fn new(iface_name: &str) -> Result<Self, MuseStatusError> {
+        let mut block: Self = Default::default();
+
+        block.iface_name = String::from(iface_name);
+
         // let client = wifi.New(); // todo
 
         // get all interfaces
@@ -46,8 +75,8 @@ impl NetworkBlock {
         };
 
         // but only select the one we want
-        let iface = if let Some(i) = get_interface(iface, interfaces) {
-            i
+        block.iface = if let Some(i) = get_interface(iface_name, interfaces) {
+            Some(i)
         } else {
             return Err(MuseStatusError::from(BasicError {
                 message: "couldn't create network block, as the specified interface doesn't exist"
@@ -55,40 +84,14 @@ impl NetworkBlock {
             }));
         };
 
-        let now = Local::now();
+        block.next_update_time = Local::now() + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS);
 
-        Ok(Self {
-            iface,
-            ssid: String::new(),
-            strength_percent: 0,
-            status: NetworkStatus::Disconnected,
-
-            dbm: 0,
-
-            next_update_time: now + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS),
-        })
+        Ok(block)
     }
 
     fn packet_loss(&self) -> Result<bool, UpdateError> {
-        let iface_name = if let Some(n) = &self.iface.name {
-            match String::from_utf8(n.clone()) {
-                Ok(s) => s,
-                Err(e) => {
-                    return Err(UpdateError {
-                        block_name: self.name().to_string(),
-                        message: format!("couldn't successfully retrieve interface name: {}", e), // well, maybe we should just store the interface name in the struct XXX
-                    });
-                }
-            }
-        } else {
-            return Err(UpdateError {
-                block_name: self.name().to_string(),
-                message: String::from("can't run `ping` without an interface name"), // well, maybe we should just store the interface name in the struct XXX
-            });
-        };
-
         let mut ping_cmd = std::process::Command::new("ping");
-        ping_cmd.args(&["ping", "-c", "2", "-W", "2", "-I", &iface_name, "8.8.8.8"]);
+        ping_cmd.args(&["ping", "-c", "2", "-W", "2", "-I", &self.iface_name, "8.8.8.8"]);
 
         let status = match ping_cmd.status() {
             Ok(s) => s,
@@ -102,6 +105,30 @@ impl NetworkBlock {
 
         Ok(!status.success())
     }
+
+    fn get_icon(&self) -> char {
+        match &self.status {
+            NetworkStatus::Disconnected => self.disconnected_icon,
+            NetworkStatus::Airplane => self.disabled_icon,
+            _ => {
+                // determine which icons we'll use based on
+                // packet_loss
+                let icons = if self.status == NetworkStatus::PacketLoss {
+                    &self.packet_loss_icons
+                } else {
+                    &self.connection_icons
+                };
+
+                // get the icon
+                let mut icon_index: usize = (icons.len() as i32 * self.strength_percent / 100) as usize;
+
+                // constrains index
+                icon_index = icon_index.min(icons.len() - 1);
+
+                icons[icon_index]
+            }
+        }
+    }
 }
 
 impl Block for NetworkBlock {
@@ -113,34 +140,50 @@ impl Block for NetworkBlock {
     // update updates the network information
     fn update(&mut self) -> Result<(), UpdateError> {
         self.next_update_time =
-            self.next_update_time + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS.into());
+            chrono::Local::now() + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS);
 
         // strength
-        let station = match self.iface.get_station_info() {
-            Ok(i) => i,
-            Err(e) => {
-                return Err(UpdateError {
-                    block_name: self.name().to_string(),
-                    message: format!("{}", e),
-                })
+        let station = if let Some(iface) = &self.iface {
+            match iface.get_station_info() {
+                Ok(i) => i,
+                Err(e) => {
+                    return Err(UpdateError {
+                        block_name: self.name().to_string(),
+                        message: format!("{}", e),
+                    })
+                }
             }
+        } else {
+            unimplemented!()
+        };
+
+        // get ssid
+        self.ssid = if let Some(iface) = &self.iface {
+            if let Some(ssid) = &iface.ssid {
+                Some(nl80211::parse_string(&ssid))
+            } else {
+                None
+            }
+        } else {
+            None
         };
 
         // get signal strength
         if let Some(s) = station.signal {
             let dbm = nl80211::parse_i8(&s);
             self.strength_percent = dbm_to_percentage(dbm) as i32;
+            self.status = NetworkStatus::Connected;
         } else {
             // if no signal, disconnected maybe?
             self.status = NetworkStatus::Disconnected;
         }
 
         // detect packet loss
-        if self.packet_loss()? {
-            self.status = NetworkStatus::PacketLoss;
-        } else {
-            self.status = NetworkStatus::Connected;
-        }
+        // if self.packet_loss()? {
+        //     self.status = NetworkStatus::PacketLoss;
+        // } else {
+        //     self.status = NetworkStatus::Connected;
+        // }
 
         Ok(())
     }
@@ -153,8 +196,8 @@ impl Block for NetworkBlock {
         match &self.status {
             NetworkStatus::Connected => Some(BlockOutputBody::from(NiceOutput {
                 attention: Attention::Normal,
-                icon: Some(get_icon(self.strength_percent, &self.status)),
-                primary_text: self.ssid.clone(),
+                icon: self.get_icon(),
+                primary_text: self.ssid.clone().unwrap_or_else(String::new),
                 secondary_text: self.status.to_string(),
             })),
             _ => None,
@@ -189,33 +232,31 @@ fn dbm_to_percentage(mut dbm: i8) -> i32 {
     (-0.04 * ((dbm_f + 30.0) * (dbm_f + 30.0) + 100.0)) as i32
 }
 
-fn get_icon(signal_strength_percent: i32, status: &NetworkStatus) -> char {
-    // determine which icons we'll use based on
-    // packet_loss
-    let icons = if *status == NetworkStatus::PacketLoss {
-        PACKET_LOSS_ICONS
-    } else {
-        CONNECTION_ICONS
-    };
-
-    // get the icon
-    let mut icon_index: usize = (icons.len() as i32 * signal_strength_percent / 100) as usize;
-
-    // constrains index
-    icon_index = icon_index.min(icons.len() - 1);
-
-    icons[icon_index]
-}
-
+/// NetworkStatus represents the state of a wireless interface.
 #[derive(PartialEq)]
 pub enum NetworkStatus {
+    /// Wireless interfaces are enabled, but there is no connection to the internet.
     Disconnected,
+
+    /// The device is connected to an access point, but packets are being lost.
     PacketLoss,
+
+    /// The device is trying to connect to the internet.
     Connecting,
+
+    /// The device is successfully connected to the internet.
     Connected,
+
+    /// The access point requires login information.
     SignInRequired,
+
+    /// Wireless interfaces are disabled.
     Airplane,
+
+    /// The connection speed is slow.
     Slow,
+
+    /// The connection signal strength is weak.
     Weak,
 }
 
@@ -235,8 +276,3 @@ impl NetworkStatus {
 }
 
 const UPDATE_INTERVAL_SECONDS: i64 = 5; // interval to update network information, in seconds
-
-const CONNECTION_ICONS: [char; 5] = ['\u{f92e}', '\u{f91e}', '\u{f921}', '\u{f924}', '\u{f927}'];
-const PACKET_LOSS_ICONS: [char; 5] = ['\u{f92a}', '\u{f91f}', '\u{f922}', '\u{f925}', '\u{f928}'];
-const DISCONNECTED_ICON: char = '\u{f92e}';
-const DISABLED_ICON: char = '\u{f92d}';
