@@ -103,9 +103,9 @@ impl Default for Formatter {
                 a: 0xff,
             },
             secondary_color: RGBA {
-                r: 0x00,
-                g: 0xaa,
-                b: 0xaa,
+                r: 0xc0,
+                g: 0xc0,
+                b: 0xc0,
                 a: 0xff,
             },
             alarm_color: RGBA {
