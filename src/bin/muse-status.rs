@@ -30,7 +30,7 @@ fn main() {
             match buf_stream.read_line(&mut s) {
                 Ok(n) => {
                     if n == 0 {
-                        eprintln!("muse-status client read 0 bytes from daemon, and is quitting");
+                        eprintln!("muse-status client read 0 bytes from daemon");
                         process::exit(1);
                     }
                     print!("{}", s);
