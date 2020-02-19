@@ -222,26 +222,24 @@ impl Block for SmartBatteryBlock {
                     _ => {
                         match self.get_completion_time() {
                             Some(completion_time) => {
-                                if completion_time < now {
+                                let minutes_left = (completion_time - now).num_minutes();
+                                if minutes_left <= 0 {
                                     None
+                                } else if minutes_left <= 30 {
+                                    Some(format!("{} min left", minutes_left))
                                 } else {
-                                    let duration_left = completion_time - now;
-                                    if duration_left <= Duration::minutes(30) {
-                                        Some(format!("{} min left", duration_left.num_minutes()))
-                                    } else {
-                                        let prefix = match &current_read.status {
-                                            ChargeStatus::Charging => "Full at",
-                                            ChargeStatus::Discharging => "Until",
-                                            _ => "",
-                                        };
+                                    let prefix = match &current_read.status {
+                                        ChargeStatus::Charging => "Full at",
+                                        ChargeStatus::Discharging => "Until",
+                                        _ => "",
+                                    };
 
-                                        Some(format!(
-                                                "{} {}",
-                                                prefix,
-                                                completion_time.format(TIME_FORMAT)
-                                        ))
-                                    } 
-                                }
+                                    Some(format!(
+                                            "{} {}",
+                                            prefix,
+                                            completion_time.format(TIME_FORMAT)
+                                    ))
+                                } 
                             }
                             None => None,
                         }
