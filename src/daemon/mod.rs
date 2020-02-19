@@ -166,7 +166,6 @@ impl Daemon {
     /// locked for the entirety of this never-ending function.
     fn listen_for_formatter_updates(daemon_arc: DaemonArc, formatter_output_rx: Receiver<String>) {
         while let Ok(o) = formatter_output_rx.recv() {
-            println!("echoing output from formatter: {}", o);
             let mut daemon = daemon_arc.lock().unwrap();
             let _ = daemon.echo(&o);
             daemon.last_output = Some(o);
