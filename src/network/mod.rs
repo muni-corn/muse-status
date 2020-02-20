@@ -4,11 +4,11 @@ use crate::format::blocks::*;
 use crate::format::Attention;
 use chrono::{DateTime, Local};
 use nl80211::Socket;
+use std::convert::TryInto;
 
 /// A block that transmits wireless interface data.
 pub struct NetworkBlock {
     iface_name: String,
-    iface: Option<nl80211::Interface>,
 
     ssid: Option<String>,
     strength_percent: i32,
@@ -26,7 +26,6 @@ impl Default for NetworkBlock {
     fn default() -> Self {
         Self {
             iface_name: String::new(),
-            iface: None,
 
             ssid: None,
             strength_percent: 0,
@@ -48,42 +47,6 @@ impl NetworkBlock {
         let mut block: Self = Default::default();
 
         block.iface_name = String::from(iface_name);
-
-        // let client = wifi.New(); // todo
-
-        // get all interfaces
-        let interfaces = match Socket::connect() {
-            Ok(mut s) => match s.get_interfaces_info() {
-                Ok(i) => i,
-                Err(e) => {
-                    return Err(MuseStatusError::from(BasicError {
-                        message: format!(
-                            "couldn't create network block (getting interfaces): {}",
-                            e
-                        ),
-                    }))
-                }
-            },
-            Err(e) => {
-                return Err(MuseStatusError::from(BasicError {
-                    message: format!(
-                        "couldn't create network block (connecting to netlink socket): {}",
-                        e
-                    ),
-                }))
-            }
-        };
-
-        // but only select the one we want
-        block.iface = if let Some(i) = get_interface(iface_name, interfaces) {
-            Some(i)
-        } else {
-            return Err(MuseStatusError::from(BasicError {
-                message: "couldn't create network block, as the specified interface doesn't exist"
-                    .to_string(),
-            }));
-        };
-
         block.next_update_time = Local::now() + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS);
 
         Ok(block)
@@ -142,36 +105,38 @@ impl Block for NetworkBlock {
         self.next_update_time =
             chrono::Local::now() + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS);
 
+        // get interface
+        let iface = match get_interface(&self.iface_name) {
+            Ok(i) => i,
+            Err(e) => return Err(UpdateError {
+                block_name: self.name().to_string(),
+                message: format!("couldn't get interface: {}", e)
+            })
+        };
+
         // strength
-        let station = if let Some(iface) = &self.iface {
-            match iface.get_station_info() {
-                Ok(i) => i,
-                Err(e) => {
-                    return Err(UpdateError {
-                        block_name: self.name().to_string(),
-                        message: format!("{}", e),
-                    })
-                }
+        let station = match iface.get_station_info() {
+            Ok(i) => i,
+            Err(e) => {
+                return Err(UpdateError {
+                    block_name: self.name().to_string(),
+                    message: format!("{}", e),
+                })
             }
-        } else {
-            unimplemented!()
         };
 
         // get ssid
-        self.ssid = if let Some(iface) = &self.iface {
-            if let Some(ssid) = &iface.ssid {
-                Some(nl80211::parse_string(&ssid))
-            } else {
-                None
-            }
+        self.ssid = if let Some(ssid) = &iface.ssid {
+            Some(nl80211::parse_string(&ssid))
         } else {
             None
         };
 
+
         // get signal strength
         if let Some(s) = station.signal {
             let dbm = nl80211::parse_i8(&s);
-            self.strength_percent = dbm_to_percentage(dbm) as i32;
+            self.strength_percent = dbm_to_percentage(dbm as i32);
             self.status = NetworkStatus::Connected;
         } else {
             // if no signal, disconnected maybe?
@@ -208,28 +173,52 @@ impl Block for NetworkBlock {
 // only returns one interface that matches the name given
 fn get_interface(
     interface_name: &str,
-    interfaces: Vec<nl80211::Interface>,
-) -> Option<nl80211::Interface> {
+) -> Result<nl80211::Interface, BasicError> {
+    // get all interfaces
+    let interfaces = match Socket::connect() {
+        Ok(mut s) => match s.get_interfaces_info() {
+            Ok(i) => i,
+            Err(e) => {
+                return Err(BasicError {
+                    message: format!(
+                                 "couldn't create network block (getting interfaces): {}",
+                                 e
+                             ),
+                })
+            }
+        },
+        Err(e) => {
+            return Err(BasicError {
+                message: format!(
+                             "couldn't create network block (connecting to netlink socket): {}",
+                             e
+                         ),
+            })
+        }
+    };
+
     for iface in interfaces {
         if let Some(n) = &iface.name {
             if nl80211::parse_string(&n).as_str().trim_matches('\u{0}') == interface_name {
-                return Some(iface);
+                return Ok(iface);
             }
         }
     }
 
-    None
+    Err(BasicError {
+        message: format!("network interface not found: {}", interface_name)
+    })
 }
 
 const SIGNAL_MAX_DBM: i32 = -30;
 const NOISE_FLOOR_DBM: i32 = -80;
 
 // thank u to i3status and NetworkManager :)
-fn dbm_to_percentage(mut dbm: i8) -> i32 {
-    dbm = dbm.max(NOISE_FLOOR_DBM as i8).min(SIGNAL_MAX_DBM as i8);
+fn dbm_to_percentage(mut dbm: i32) -> i32 {
+    dbm = dbm.max(NOISE_FLOOR_DBM).min(SIGNAL_MAX_DBM);
     let dbm_f = dbm as f64;
 
-    (-0.04 * ((dbm_f + 30.0) * (dbm_f + 30.0) + 100.0)) as i32
+    (-0.04 * (dbm_f + 30.0).powi(2) + 100.0) as i32
 }
 
 /// NetworkStatus represents the state of a wireless interface.
