@@ -78,7 +78,6 @@ impl Block for MprisBlock {
             let player = loop {
                 thread::sleep(std::time::Duration::from_secs(5));
 
-                println!("trying to find player");
                 if let Ok(player_finder) = mpris_lib::PlayerFinder::new() {
                     if let Ok(player) = player_finder.find_active() {
                         break player
@@ -93,12 +92,9 @@ impl Block for MprisBlock {
                 block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
             }
 
-            println!("found player: {:?}", player);
 
             if let Ok(mut events) = player.events() {
-                println!("got event");
                 while let Some(Ok(e)) = events.next() {
-                    println!("got some ok event");
                     // update the player data, then send the update
                     let mut block = mutex.lock().unwrap();
 
@@ -114,8 +110,6 @@ impl Block for MprisBlock {
                     block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
                 }
             }
-
-            println!("events loop broken");
 
             {
                 let mut block = mutex.lock().unwrap();
