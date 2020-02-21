@@ -4,7 +4,6 @@ use crate::format::blocks::*;
 use crate::format::Attention;
 use chrono::{DateTime, Local};
 use nl80211::Socket;
-use std::convert::TryInto;
 
 /// A block that transmits wireless interface data.
 pub struct NetworkBlock {
