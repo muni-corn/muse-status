@@ -6,12 +6,12 @@ use std::process;
 use std::env;
 
 fn main() {
-    let mut stream = match net::TcpStream::connect("localhost:1612") {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("couldn't connect to the daemon: {}", e);
-            return;
+    let mut stream = loop {
+        if let Ok(s) = net::TcpStream::connect("localhost:1612") {
+            break s
         }
+
+        std::thread::sleep(std::time::Duration::from_secs(1));
     };
 
     // send a command to the daemon
