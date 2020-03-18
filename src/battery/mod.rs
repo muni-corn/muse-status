@@ -46,7 +46,7 @@ struct BatteryRead {
 }
 
 const SYS_POWER_SUPPLY_BASE_DIR: &str = "/sys/class/power_supply/";
-const MAX_READS: i32 = 40; // used for moving averages
+const MAX_READS: i32 = 15; // used for moving averages
 const TIME_FORMAT: &str = "%-I:%M %P";
 
 /// Data block for battery reports and estimates
