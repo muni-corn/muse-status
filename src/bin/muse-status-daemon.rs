@@ -41,7 +41,7 @@ fn main() {
     let ternary_blocks: Vec<Box<dyn Block>> = Vec::new();
 
     let mut daemon = Daemon::new("localhost:1612");
-    if let Err(e) = daemon.handle_args(&env::args().skip(1).collect::<Vec<String>>()) {
+    if let Err(e) = daemon.handle_flags(&env::args().skip(1).collect::<Vec<String>>()) {
         eprintln!("couldn't parse arguments: {}", e)
     }
 
