@@ -1,44 +1,64 @@
 use std::io::Write;
 use std::io;
 use std::io::BufRead;
-use std::net;
+use std::net::TcpStream;
 use std::process;
 use std::env;
+use muse_status::daemon::Action;
+use serde::Serialize;
 
 fn main() {
-    let mut stream = loop {
-        if let Ok(s) = net::TcpStream::connect("localhost:1612") {
-            break s
+    let action = if let Some(first_arg) = env::args().nth(1) {
+        let s = env::args().skip(1).collect::<Vec<String>>().join(" ");
+        if let Some(first_char) = first_arg.chars().next() {
+            if first_char == '-' {
+                Action::Flags(Some(s))
+            } else {
+                Action::Command(s)
+            }
+        } else {
+            Action::Flags(None)
         }
-
-        std::thread::sleep(std::time::Duration::from_secs(1));
+    } else {
+        Action::Flags(None)
     };
 
-    // send a command to the daemon
-    let mut command = env::args().skip(1).collect::<Vec<String>>().join(" ");
-    command.push('\n'); // end command in newline
-
-    stream.write_all(command.as_bytes()).unwrap();
-
-    if command.trim().is_empty() || command.starts_with('-') {
-        // create a buffered stream, which we'll read from line by line for status outputs
-        let mut buf_stream = io::BufReader::new(stream);
-
-        // listen for outputs from the daemon and print them
-        let e = loop {
-            let mut s = String::new();
-            match buf_stream.read_line(&mut s) {
-                Ok(n) => {
-                    if n == 0 {
-                        eprintln!("muse-status client read 0 bytes from daemon");
-                        process::exit(1);
-                    }
-                    print!("{}", s);
-                }
-                Err(e) => break e,
+    // start loop. muse-status will try listening for the daemon again if it is disconnected
+    loop {
+        let mut stream = loop {
+            if let Ok(s) = TcpStream::connect("localhost:1612") {
+                break s
             }
+
+            std::thread::sleep(std::time::Duration::from_secs(1));
         };
 
-        eprintln!("an error has stopped muse-status: {}", e)
+        stream.write_all(format!("{}\n", serde_json::to_string(&action).unwrap()).as_bytes()).unwrap();
+
+        if let Action::Flags(_) = &action {
+            start_listening(stream)
+        } else {
+            return
+        }
     }
+}
+
+fn start_listening(stream: TcpStream) {
+    // create a buffered stream, which we'll read from line by line for status outputs
+    let mut buf_stream = io::BufReader::new(stream);
+
+    // listen for outputs from the daemon and print them
+    let e = loop {
+        let mut s = String::new();
+        match buf_stream.read_line(&mut s) {
+            Ok(n) => {
+                if n == 0 {
+                    eprintln!("muse-status client read 0 bytes from daemon");
+                    process::exit(1);
+                }
+                print!("{}", s);
+            }
+            Err(e) => break e,
+        }
+    };
 }
