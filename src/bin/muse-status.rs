@@ -48,17 +48,16 @@ fn start_listening(stream: TcpStream) {
     let mut buf_stream = io::BufReader::new(stream);
 
     // listen for outputs from the daemon and print them
-    let e = loop {
+    loop {
         let mut s = String::new();
         match buf_stream.read_line(&mut s) {
             Ok(n) => {
                 if n == 0 {
-                    eprintln!("muse-status client read 0 bytes from daemon");
-                    process::exit(1);
+                    return
                 }
                 print!("{}", s);
             }
-            Err(e) => break e,
+            Err(_) => return,
         }
     };
 }
