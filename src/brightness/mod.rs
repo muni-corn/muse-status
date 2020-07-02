@@ -11,8 +11,8 @@ const BRIGHTNESS_ICONS: [char; 6] = ['\u{F00DB}', '\u{F00DC}', '\u{F00DD}', '\u{
 /// BrightnessBlock is a block that contains device brightness information
 pub struct BrightnessBlock {
     card: String,
-    current_brightness: i32,
-    max_brightness: i32,
+    current_brightness: u32,
+    max_brightness: u32,
 }
 
 impl BrightnessBlock {
@@ -36,7 +36,7 @@ impl BrightnessBlock {
             .join(&self.card)
             .join("max_brightness");
         self.max_brightness = match utils::get_int_from_file(path) {
-            Ok(b) => b,
+            Ok(b) => b as u32,
             Err(e) => {
                 return Err(UpdateError {
                     block_name: self.name().to_string(),
@@ -52,7 +52,7 @@ impl BrightnessBlock {
         self.current_brightness = match utils::get_int_from_file(
             &PathBuf::from(BASE_DIR).join(&self.card).join("brightness"),
         ) {
-            Ok(b) => b,
+            Ok(b) => b as u32,
             Err(e) => {
                 return Err(UpdateError {
                     block_name: self.name().to_string(),
@@ -87,7 +87,7 @@ impl Block for BrightnessBlock {
         }
 
         let percent = self.current_brightness * 100 / self.max_brightness;
-        let icon = get_icon(percent);
+        let icon = get_icon(percent as u32);
         Some(BlockOutputBody::from(crate::format::bit::Bit {
             text: format!("{}  {}%", icon, percent),
             color: Some(Color::Secondary),
@@ -96,11 +96,9 @@ impl Block for BrightnessBlock {
     }
 }
 
-fn get_icon(percentage: i32) -> char {
-    let index = ((percentage * BRIGHTNESS_ICONS.len() as i32 / 100) as usize)
+fn get_icon(percentage: u32) -> char {
+    let index = (percentage as usize * BRIGHTNESS_ICONS.len() / 100)
         .min(BRIGHTNESS_ICONS.len() - 1);
-
-    // constrain index (should never go below zero)
 
     BRIGHTNESS_ICONS[index]
 }
