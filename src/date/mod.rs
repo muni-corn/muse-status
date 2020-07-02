@@ -9,7 +9,7 @@ use rodio::{Device, Source};
 
 const TIME_FORMAT: &str = "%-I:%M %P";
 const DATE_FORMAT: &str = "%a, %b %-d";
-const ICON: char = '\u{f150}';
+const CLOCK_ICONS: [char; 12] = ['\u{F144A}', '\u{F144B}', '\u{F144C}', '\u{F144D}', '\u{F144E}', '\u{F144F}', '\u{F1450}', '\u{F1451}', '\u{F1452}', '\u{F1453}', '\u{F1454}', '\u{F1455}'];
 
 /// Transmits time and date data.
 pub struct DateBlock {
@@ -79,8 +79,9 @@ impl Block for DateBlock {
     }
 
     fn output(&self) -> Option<BlockOutputBody> {
+        let icon_index = self.now.hour() % 12;
         Some(BlockOutputBody::from(NiceOutput {
-            icon: ICON,
+            icon: CLOCK_ICONS[icon_index as usize],
             primary_text: format!("{}", self.now.format(TIME_FORMAT)),
             secondary_text: Some(format!("{}", self.now.format(DATE_FORMAT))),
             attention: Attention::Normal,
