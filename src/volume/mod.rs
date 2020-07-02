@@ -77,7 +77,9 @@ impl VolumeBlock {
     }
 
     fn get_icon(&self) -> char {
-        if self.muted || self.current_volume == 0 {
+        if self.current_volume == 0 {
+            ZERO_ICON
+        } else if self.muted {
             MUTE_ICON
         } else {
             let index = (self.current_volume as usize * VOLUME_ICONS.len() / 100)
