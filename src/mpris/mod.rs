@@ -25,8 +25,8 @@ impl Default for MprisBlock {
     fn default() -> Self {
         MprisBlock {
             next_update_time: chrono::Local::now() + chrono::Duration::seconds(5),
-            playing_icon: '\u{f387}',
-            paused_icon: '\u{f3e4}',
+            playing_icon: '\u{F0F74}',
+            paused_icon: '\u{F03E4}',
 
             status: PlayerStatus::Stopped,
             title: None,
