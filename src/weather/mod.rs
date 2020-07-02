@@ -44,27 +44,27 @@ pub struct WeatherBlock {
 impl Default for WeatherBlock {
     fn default() -> Self {
         let mut weather_icons = HashMap::<String, char>::new();
-        weather_icons.insert(String::from("01d"), '');
-        weather_icons.insert(String::from("01n"), '');
-        weather_icons.insert(String::from("02d"), '');
-        weather_icons.insert(String::from("02n"), '');
-        weather_icons.insert(String::from("03d"), '');
-        weather_icons.insert(String::from("03n"), '');
-        weather_icons.insert(String::from("04d"), '');
-        weather_icons.insert(String::from("04n"), '');
-        weather_icons.insert(String::from("09d"), '');
-        weather_icons.insert(String::from("09n"), '');
-        weather_icons.insert(String::from("10d"), '');
-        weather_icons.insert(String::from("10n"), '');
-        weather_icons.insert(String::from("11d"), '');
-        weather_icons.insert(String::from("11n"), '');
-        weather_icons.insert(String::from("13d"), '');
-        weather_icons.insert(String::from("13n"), '');
-        weather_icons.insert(String::from("50d"), '');
-        weather_icons.insert(String::from("50n"), '');
+        weather_icons.insert(String::from("01d"), '\u{F0599}');
+        weather_icons.insert(String::from("01n"), '\u{F0594}');
+        weather_icons.insert(String::from("02d"), '\u{F0595}');
+        weather_icons.insert(String::from("02n"), '\u{F0F31}');
+        weather_icons.insert(String::from("03d"), '\u{F0590}');
+        weather_icons.insert(String::from("03n"), '\u{F0590}');
+        weather_icons.insert(String::from("04d"), '\u{F0590}');
+        weather_icons.insert(String::from("04n"), '\u{F0590}');
+        weather_icons.insert(String::from("09d"), '\u{F0597}');
+        weather_icons.insert(String::from("09n"), '\u{F0597}');
+        weather_icons.insert(String::from("10d"), '\u{F0596}');
+        weather_icons.insert(String::from("10n"), '\u{F0596}');
+        weather_icons.insert(String::from("11d"), '\u{F0593}');
+        weather_icons.insert(String::from("11n"), '\u{F0593}');
+        weather_icons.insert(String::from("13d"), '\u{F0598}');
+        weather_icons.insert(String::from("13n"), '\u{F0598}');
+        weather_icons.insert(String::from("50d"), '\u{F0591}');
+        weather_icons.insert(String::from("50n"), '\u{F0591}');
 
-        let default_icon = '\u{f50f}';
-        let openweathermap_key = "d179cc80ed41e8080f9e86356b604ee3"; // TODO
+        let default_icon = '\u{F0590}';
+        let openweathermap_key = "d179cc80ed41e8080f9e86356b604ee3"; // TODO: users should supply their own key
         let units = Units::Imperial;
 
         Self {
