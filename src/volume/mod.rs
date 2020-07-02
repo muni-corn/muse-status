@@ -117,5 +117,6 @@ impl Block for VolumeBlock {
     }
 }
 
-const VOLUME_ICONS: [char; 3] = ['', '', ''];
-const MUTE_ICON: char = '';
+const VOLUME_ICONS: [char; 3] = ['\u{F057F}', '\u{F0580}', '\u{F057E}'];
+const MUTE_ICON: char = '\u{F0581}';
+const ZERO_ICON: char = '\u{F0E08}';
