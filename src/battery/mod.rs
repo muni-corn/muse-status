@@ -354,7 +354,7 @@ const DISCHARGING_ICONS: [char; 11] = [
 ];
 const CHARGING_ICONS: [char; 11] = [
     '\u{f089f}', '\u{f089c}', '\u{f0086}', '\u{f0087}', '\u{f0088}', '\u{f089d}', '\u{f0089}', '\u{f089e}',
-    '\u{f008a}', '\u{f008b}', '\u{f0079}',
+    '\u{f008a}', '\u{f008b}', '\u{f0085}',
 ];
 const FULL_ICON: char = '\u{f0084}';
 const UNKNOWN_ICON: char = '\u{f0091}';
