@@ -349,15 +349,15 @@ fn get_new_average_rate(avg_rate_now: f32, reads: i32, new_read_rate: f32) -> f3
 }
 
 const DISCHARGING_ICONS: [char; 11] = [
-    '\u{f08e}', '\u{f07a}', '\u{f07b}', '\u{f07c}', '\u{f07d}', '\u{f07e}', '\u{f07f}', '\u{f080}',
-    '\u{f081}', '\u{f082}', '\u{f079}',
+    '\u{f008e}', '\u{f007a}', '\u{f007b}', '\u{f007c}', '\u{f007d}', '\u{f007e}', '\u{f007f}', '\u{f0080}',
+    '\u{f0081}', '\u{f0082}', '\u{f0079}',
 ];
 const CHARGING_ICONS: [char; 11] = [
-    '\u{f89e}', '\u{f89b}', '\u{f086}', '\u{f087}', '\u{f088}', '\u{f89c}', '\u{f089}', '\u{f89d}',
-    '\u{f08a}', '\u{f08b}', '\u{f085}',
+    '\u{f089f}', '\u{f089c}', '\u{f0086}', '\u{f0087}', '\u{f0088}', '\u{f089d}', '\u{f0089}', '\u{f089e}',
+    '\u{f008a}', '\u{f008b}', '\u{f0079}',
 ];
-const FULL_ICON: char = '\u{f084}';
-const UNKNOWN_ICON: char = '\u{f590}';
+const FULL_ICON: char = '\u{f0084}';
+const UNKNOWN_ICON: char = '\u{f0091}';
 
 // returns a battery icon
 fn get_battery_icon(status: &ChargeStatus, percentage: i32) -> char {
