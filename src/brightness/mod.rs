@@ -6,7 +6,7 @@ use crate::utils;
 use std::path::PathBuf;
 
 const BASE_DIR: &str = "/sys/class/backlight/";
-const BRIGHTNESS_ICONS: [char; 6] = ['', '', '', '', '', ''];
+const BRIGHTNESS_ICONS: [char; 6] = ['\u{F00DB}', '\u{F00DC}', '\u{F00DD}', '\u{F00DE}', '\u{F00DF}', '\u{F00E0}'];
 
 /// BrightnessBlock is a block that contains device brightness information
 pub struct BrightnessBlock {
