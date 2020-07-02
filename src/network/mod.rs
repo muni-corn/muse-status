@@ -15,6 +15,7 @@ pub struct NetworkBlock {
 
     connection_icons: Vec<char>,
     packet_loss_icons: Vec<char>,
+    vpn_icons: Vec<char>,
     disconnected_icon: char,
     disabled_icon: char,
 
@@ -30,10 +31,11 @@ impl Default for NetworkBlock {
             strength_percent: 0,
             status: NetworkStatus::Disconnected,
 
-            connection_icons: vec!['\u{f92e}', '\u{f91e}', '\u{f921}', '\u{f924}', '\u{f927}'],
-            packet_loss_icons: vec!['\u{f92a}', '\u{f91f}', '\u{f922}', '\u{f925}', '\u{f928}'],
-            disconnected_icon: '\u{f92e}',
-            disabled_icon: '\u{f92d}',
+            connection_icons: vec!['\u{F092F}', '\u{F091F}', '\u{F0922}', '\u{F0925}', '\u{F0928}'],
+            packet_loss_icons: vec!['\u{F092B}', '\u{F0920}', '\u{F0923}', '\u{F0926}', '\u{F0929}'],
+            vpn_icons: vec!['\u{F092C}', '\u{F0921}', '\u{F0924}', '\u{F0927}', '\u{F092A}'],
+            disconnected_icon: '\u{F092B}',
+            disabled_icon: '\u{F092E}',
 
             next_update_time: Local::now(),
         }
@@ -234,6 +236,9 @@ pub enum NetworkStatus {
 
     /// The device is successfully connected to the internet.
     Connected,
+
+    /// The device is connected to the internet through a VPN.
+    Vpn,
 
     /// The access point requires login information.
     SignInRequired,
