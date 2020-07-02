@@ -264,6 +264,7 @@ impl NetworkStatus {
             Self::Airplane => Some(String::from("Airplane mode")),
             Self::Slow => Some(String::from("Slow connection")),
             Self::Weak => Some(String::from("Weak connection")),
+            Self::Vpn => Some(String::from("Secured")),
         }
     }
 }
