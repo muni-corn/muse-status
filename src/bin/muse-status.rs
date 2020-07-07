@@ -23,24 +23,24 @@ fn main() {
         Action::Flags(None)
     };
 
-    // start loop. muse-status will try listening for the daemon again if it is disconnected
-    loop {
-        let mut stream = loop {
-            if let Ok(s) = TcpStream::connect("localhost:1612") {
-                break s
-            }
-
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        };
-
-        stream.write_all(format!("{}\n", serde_json::to_string(&action).unwrap()).as_bytes()).unwrap();
-
-        if let Action::Flags(_) = &action {
-            start_listening(stream)
-        } else {
-            return
+    // start
+    let mut stream = loop {
+        if let Ok(s) = TcpStream::connect("localhost:1612") {
+            break s
         }
+
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    };
+
+    stream.write_all(format!("{}\n", serde_json::to_string(&action).unwrap()).as_bytes()).unwrap();
+
+    if let Action::Flags(_) = &action {
+        start_listening(stream)
+    } else {
+        return
     }
+
+    println!(r#"[{{name: "error", long_text: "disconnected", short_text: "disconnected"}}]"#)
 }
 
 fn start_listening(stream: TcpStream) {
