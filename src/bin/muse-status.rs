@@ -23,27 +23,25 @@ fn main() {
         Action::Flags(None)
     };
 
-    // start loop. muse-status will try listening for the daemon again if it is disconnected
-    loop {
-        let mut stream = loop {
-            if let Ok(s) = TcpStream::connect("localhost:1612") {
-                break s
-            }
-
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        };
-
-        stream.write_all(format!("{}\n", serde_json::to_string(&action).unwrap()).as_bytes()).unwrap();
-
-        if let Action::Flags(_) = &action {
-            start_listening(stream)
-        } else {
-            return
+    // start
+    let mut stream = loop {
+        if let Ok(s) = TcpStream::connect("localhost:1612") {
+            break s
         }
+
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    };
+
+    stream.write_all(format!("{}\n", serde_json::to_string(&action).unwrap()).as_bytes()).unwrap();
+
+    if let Action::Flags(_) = &action {
+        let err = start_listening(stream);
+        println!(r#",[{{"name":"error","long_text":"disconnected: {}","short_text":"disconnected","markup":"none"}}]"#, err);
+        std::thread::park();
     }
 }
 
-fn start_listening(stream: TcpStream) {
+fn start_listening(stream: TcpStream) -> String {
     // create a buffered stream, which we'll read from line by line for status outputs
     let mut buf_stream = io::BufReader::new(stream);
 
@@ -53,11 +51,11 @@ fn start_listening(stream: TcpStream) {
         match buf_stream.read_line(&mut s) {
             Ok(n) => {
                 if n == 0 {
-                    return
+                    return "no bytes read".to_owned()
                 }
                 print!("{}", s);
             }
-            Err(_) => return,
+            Err(e) => return format!("error: {}", e),
         }
     };
 }
