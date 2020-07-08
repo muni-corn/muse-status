@@ -64,6 +64,9 @@ impl Daemon {
         // start listening on the daemon's address
         let listener = TcpListener::bind(&self.addr)?;
 
+        // set block names from blocks
+        self.set_block_names_from_blocks(&primary_blocks, &secondary_blocks, &tertiary_blocks);
+
         // get channels for block outputs and banners
         let (block_tx, block_rx) = mpsc::channel::<BlockOutput>();
         let (_banner_tx, banner_rx) = mpsc::channel::<format::Banner>();
@@ -111,9 +114,19 @@ impl Daemon {
             .unwrap(),
         );
 
-        // thread::spawn(self.listen_for_xorg_changes());
-
         Ok(thread_handles)
+    }
+
+    fn set_block_names_from_blocks(&mut self, primary_blocks: &BlockVec, secondary_blocks: &BlockVec, tertiary_blocks: &BlockVec) {
+        for p in primary_blocks {
+            self.block_names.0.push(p.name().to_string());
+        }
+        for s in secondary_blocks {
+            self.block_names.1.push(s.name().to_string());
+        }
+        for t in tertiary_blocks {
+            self.block_names.2.push(t.name().to_string());
+        }
     }
 
     fn start_all_blocks(
@@ -161,8 +174,10 @@ impl Daemon {
     /// Shound be run within a separate thread. `self` should NOT a parameter, as a mutex would be
     /// locked for the entirety of this never-ending function.
     fn listen_to_blocks(daemon_arc: DaemonMutexArc, block_rx: Receiver<BlockOutput>) {
-        while let Ok(_) = block_rx.recv() {
-            let _ = daemon_arc.lock().unwrap().send_data_to_all(); // TODO
+        while let Ok(output) = block_rx.recv() {
+            let mut daemon = daemon_arc.lock().unwrap();
+            daemon.block_outputs.insert(output.block_name.clone(), output.clone());
+            let _ = daemon.send_data_to_all(); // TODO
         }
     }
 
