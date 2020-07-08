@@ -4,7 +4,7 @@ use crate::format::{Attention, Formatter};
 use serde::{Deserialize, Serialize};
 
 /// The output of a Block.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BlockOutput {
     /// The name of the original block.
     pub block_name: String,
