@@ -9,17 +9,19 @@ pub mod color;
 
 // TODO create a separate module for Banner
 
+use crate::daemon::DataOutput;
 use crate::utils;
-use crate::format::blocks::output::BlockOutput;
-use crate::format::blocks::Block;
-use color::{RGBA, Color};
+use color::{Color, RGBA};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::mpsc;
+use serde::{Deserialize, Serialize};
+use crate::format::blocks::output::{BlockOutputContent, BlockOutput};
 
 /// Attention provides a way to easily apply colors to a Block, without actually passing any RGBA
 /// values.
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum Attention {
     /// Static dim color.
     Dim,
@@ -61,12 +63,8 @@ pub struct Formatter {
     text_font: String,
     icon_font: String,
 
-    primary_block_names: Vec<String>,
-    secondary_block_names: Vec<String>,
-    ternary_block_names: Vec<String>,
-
     /// Stores outputs of blocks.
-    outputs: HashMap<String, blocks::output::BlockOutput>,
+    outputs: HashMap<String, blocks::output::BlockOutputContent>,
 
     /// A banner queue.
     banners: VecDeque<Banner>,
@@ -123,10 +121,6 @@ impl Default for Formatter {
             text_font: String::from("Roboto 10"),
             icon_font: String::from("Material Design Icons 12"),
 
-            primary_block_names: Vec::new(),
-            secondary_block_names: Vec::new(),
-            ternary_block_names: Vec::new(),
-
             outputs: HashMap::new(),
 
             banners: VecDeque::new(),
@@ -138,73 +132,38 @@ impl Default for Formatter {
 
 impl Formatter {
     /// Returns a new Formatter with the block names provided.
-    #[deprecated]
-    pub fn new(
-        primary_block_names: Vec<String>,
-        secondary_block_names: Vec<String>,
-        ternary_block_names: Vec<String>,
-    ) -> Self {
-        let mut f: Self = Default::default();
-        f.primary_block_names = primary_block_names;
-        f.secondary_block_names = secondary_block_names;
-        f.ternary_block_names = ternary_block_names;
-
-        f
+    pub fn new() -> Self {
+        Default::default()
     }
 
     /// Chains status bites together, ensuring that there are no awkward spaces between bites, and
-    /// outputs a result fit to be parsed by a status bar
-    fn output(&self) -> String {
+    /// outputs a result fit to be parsed by a status bar. The string can safely be printed as-is
+    /// without additional formatting.
+    pub fn format_data(&self, data: DataOutput) -> String {
         match self.formatting_mode {
             Mode::JsonProtocol => {
                 let mut string_outputs: Vec<String> = Vec::new();
-                for block_name in self.ternary_block_names.iter().chain(self.secondary_block_names.iter().chain(self.primary_block_names.iter().rev())) {
-                    if let Some(bo) = self.outputs.get(block_name) {
-                        if let Some(jps) = bo.as_json_protocol_string(self) {
-                            string_outputs.push(jps)
-                        }
+                for block_output in data
+                    .tertiary
+                    .iter()
+                    .chain(data.secondary.iter().chain(data.primary.iter().rev()))
+                {
+                    if let Some(jps) = self.block_output_as_json_protocol_string(block_output) {
+                        string_outputs.push(jps)
                     }
                 }
                 let joined = string_outputs.join(",");
-                format!("[{}]", joined)
+                format!(",[{}]", joined)
             }
-            Mode::Lemonbar => {
-                unimplemented!()
-            }
+            Mode::Lemonbar => unimplemented!(),
         }
     }
 
-    /// Returns a new Formatter that takes block names from the slices of blocks provided. Favored
-    /// over `new`, because this method requires actual blocks that have already been created.
-    pub fn from_blocks(
-        primary_blocks: &[Box<dyn Block>],
-        secondary_blocks: &[Box<dyn Block>],
-        ternary_blocks: &[Box<dyn Block>],
-    ) -> Self {
-        let mut f: Self = Default::default();
-
-        f.set_block_names_from_blocks(primary_blocks, secondary_blocks, ternary_blocks);
-
-        f
-    }
-
-    /// Sets the order of blocks and block names.
-    pub fn set_block_names_from_blocks(
-        &mut self,
-        primary_blocks: &[Box<dyn Block>],
-        secondary_blocks: &[Box<dyn Block>],
-        ternary_blocks: &[Box<dyn Block>],
-    ) {
-        for b in primary_blocks.iter() {
-            self.primary_block_names.push(String::from(b.name()));
-        }
-
-        for b in secondary_blocks.iter() {
-            self.secondary_block_names.push(String::from(b.name()));
-        }
-
-        for b in ternary_blocks.iter() {
-            self.ternary_block_names.push(String::from(b.name()));
+    /// Formats an error in a format that can be parsed and displayed by a status bar.
+    pub fn format_error<E: std::error::Error>(&self, _: E) -> String {
+        match self.formatting_mode {
+            Mode::JsonProtocol => unimplemented!(),
+            Mode::Lemonbar => unimplemented!(),
         }
     }
 
@@ -218,28 +177,9 @@ impl Formatter {
         &self.formatting_mode
     }
 
-    /// Updates a block in the Formatter with the value. If the value is None, the block is removed
-    /// from the Formatter's output.
-    pub fn update(&mut self, output: BlockOutput) {
-        self.outputs.insert(output.block_name.clone(), output);
-        if let Some(sender) = &self.output_sender {
-            sender.send(self.output()).unwrap();
-        }
-    }
-
     /// Activates and displays a banner.
     pub fn banner(&mut self, _banner: Banner) {
         unimplemented!()
-    }
-
-    /// Replaces the current output channel associated with this Formatter, creates a new channel,
-    /// saves the Sender in the struct, and returns the Receiver.
-    #[must_use]
-    pub fn new_output_channel(&mut self) -> mpsc::Receiver<String> {
-        let (tx, rx) = mpsc::channel();
-        self.output_sender = Some(tx);
-
-        rx
     }
 
     /// Sets the text font of the Formatter.
@@ -324,9 +264,46 @@ impl Formatter {
         }
     }
 
+    /// Formats the BlockOutput for the i3 JSON protocol. None if body is None.
+    fn block_output_as_json_protocol_string(&self, b: &BlockOutput) -> Option<String> {
+        if let Some(body) = &b.body {
+            let (full_text, short_text) = match body {
+                BlockOutputContent::Nice(n) => n.as_pango_strings(self),
+                BlockOutputContent::SingleBit(b) => {
+                    let pango = b.as_pango_string(self);
+                    (pango.clone(), pango)
+                }
+                BlockOutputContent::Custom(c) => (c.clone(), c.clone()),
+            };
+
+            let json = JsonBlock {
+                full_text,
+                short_text,
+                separator: true,
+                markup: String::from("pango"),
+                name: b.block_name.clone(),
+            };
+
+            match serde_json::to_string(&json) {
+                Ok(s) => Some(s),
+                Err(_) => None,
+            }
+        } else {
+            None
+        }
+    }
 }
 
 // /// Returns 4 spaces as a separator between data.
 // fn separator<'a>() -> &'a str {
 //     "    "
 // }
+
+#[derive(Serialize, Deserialize, Debug)]
+struct JsonBlock {
+    name: String,
+    full_text: String,
+    short_text: String,
+    separator: bool,
+    markup: String,
+}

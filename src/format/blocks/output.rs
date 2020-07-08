@@ -4,57 +4,28 @@ use crate::format::{Attention, Formatter};
 use serde::{Deserialize, Serialize};
 
 /// The output of a Block.
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct BlockOutput {
     /// The name of the original block.
     pub block_name: String,
 
     /// The body of the BlockOutput, optional. If None, the output is removed.
-    pub body: Option<BlockOutputBody>,
+    pub body: Option<BlockOutputContent>,
 }
 
 impl BlockOutput {
     /// Returns a new BlockOutput.
-    pub fn new(block_name: &str, body: Option<BlockOutputBody>) -> Self {
+    pub fn new(block_name: &str, body: Option<BlockOutputContent>) -> Self {
         Self {
             block_name: String::from(block_name),
             body,
         }
     }
-
-    /// Formats the BlockOutput for the i3 JSON protocol. None if body is None.
-    pub fn as_json_protocol_string(&self, f: &Formatter) -> Option<String> {
-        if let Some(body) = &self.body {
-            let (full_text, short_text) = match body {
-                BlockOutputBody::Nice(n) => n.as_pango_strings(f),
-                BlockOutputBody::SingleBit(b) => {
-                    let pango = b.as_pango_string(f);
-                    (pango.clone(), pango)
-                }
-                BlockOutputBody::Custom(c) => (c.clone(), c.clone()),
-            };
-
-            let json = JsonBlock {
-                full_text,
-                short_text,
-                separator: true,
-                markup: String::from("pango"),
-                name: self.block_name.clone(),
-            };
-
-            match serde_json::to_string(&json) {
-                Ok(s) => Some(s),
-                Err(_) => None,
-            }
-        } else {
-            None
-        }
-    }
 }
 
 /// The body of a BlockOutput.
-#[derive(Debug, Serialize, Deserialize)]
-pub enum BlockOutputBody {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum BlockOutputContent {
     /// Sexy block output.
     Nice(NiceOutput),
 
@@ -65,32 +36,32 @@ pub enum BlockOutputBody {
     Custom(String),
 }
 
-impl From<NiceOutput> for BlockOutputBody {
+impl From<NiceOutput> for BlockOutputContent {
     fn from(n: NiceOutput) -> Self {
         Self::Nice(n)
     }
 }
 
-impl From<Bit> for BlockOutputBody {
+impl From<Bit> for BlockOutputContent {
     fn from(b: Bit) -> Self {
         Self::SingleBit(b)
     }
 }
 
-impl From<String> for BlockOutputBody {
+impl From<String> for BlockOutputContent {
     fn from(s: String) -> Self {
         Self::Custom(s)
     }
 }
 
-impl From<&str> for BlockOutputBody {
+impl From<&str> for BlockOutputContent {
     fn from(s: &str) -> Self {
         Self::Custom(String::from(s))
     }
 }
 
 /// A struct for creating nice-looking block outputs.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct NiceOutput {
     /// The icon of the block.
     pub icon: char,
@@ -157,13 +128,4 @@ impl NiceOutput {
             (short_text.clone(), short_text)
         }
     }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct JsonBlock {
-    name: String,
-    full_text: String,
-    short_text: String,
-    separator: bool,
-    markup: String,
 }

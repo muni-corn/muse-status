@@ -7,23 +7,24 @@ use muse_status::mpris;
 use muse_status::network;
 use muse_status::volume;
 use muse_status::weather;
-use std::env;
 
 fn main() {
-    // TODO parse from configuration file
+    if std::env::args().count() > 1 {
+        println!("muse-status-daemon doesn't need any arguments, but it was nice of you to provide some :)");
+    }
 
+    // TODO parse from configuration file
     let battery_block = battery::SmartBatteryBlock::new("BAT0", 30, 15);
     let brightness_block = brightness::BrightnessBlock::new("amdgpu_bl0");
     let date_block = date::DateBlock::new();
     let network_block = match network::NetworkBlock::new("wlo1") {
         Ok(n) => n,
         Err(e) => {
-            eprintln!("couldn't create the network block: {}", e);
+            eprintln!("couldn't create network block: {}", e);
             return;
         }
     };
     let mpris_block = mpris::MprisBlock::new();
-
     let volume_block = volume::VolumeBlock::new();
     let weather_block = weather::WeatherBlock::new();
 
@@ -38,14 +39,10 @@ fn main() {
         Box::new(network_block),
         Box::new(battery_block),
     ];
-    let ternary_blocks: Vec<Box<dyn Block>> = Vec::new();
+    let tertiary_blocks: Vec<Box<dyn Block>> = Vec::new();
 
-    let mut daemon = Daemon::new("localhost:1612");
-    if let Err(e) = daemon.handle_flags(&env::args().skip(1).collect::<Vec<String>>()) {
-        eprintln!("couldn't parse arguments: {}", e)
-    }
-
-    match daemon.start(primary_blocks, secondary_blocks, ternary_blocks) {
+    let daemon = Daemon::new("localhost:1612");
+    match daemon.start(primary_blocks, secondary_blocks, tertiary_blocks) {
         Ok(j) => {
             println!("the daemon is running");
             for handle in j {

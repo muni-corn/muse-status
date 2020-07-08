@@ -1,5 +1,5 @@
 use crate::errors::*;
-use crate::format::blocks::output::{BlockOutputBody, NiceOutput};
+use crate::format::blocks::output::{BlockOutputContent, NiceOutput};
 use crate::format::blocks::Block;
 use crate::format::Attention;
 use std::process;
@@ -105,8 +105,8 @@ impl Block for VolumeBlock {
         None
     }
 
-    fn output(&self) -> Option<BlockOutputBody> {
-        Some(BlockOutputBody::Nice(NiceOutput {
+    fn output(&self) -> Option<BlockOutputContent> {
+        Some(BlockOutputContent::Nice(NiceOutput {
             icon: self.get_icon(),
             primary_text: if self.muted || self.current_volume == 0 {
                 String::from("Muted")

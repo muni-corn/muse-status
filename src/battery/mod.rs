@@ -206,7 +206,7 @@ impl Block for SmartBatteryBlock {
         "battery"
     }
 
-    fn output(&self) -> Option<BlockOutputBody> {
+    fn output(&self) -> Option<BlockOutputContent> {
         match &self.current_read {
             Some(current_read) => {
                 let now = Local::now();
@@ -266,7 +266,7 @@ impl Block for SmartBatteryBlock {
                     Attention::Normal
                 };
 
-                Some(BlockOutputBody::Nice(NiceOutput {
+                Some(BlockOutputContent::Nice(NiceOutput {
                     primary_text,
                     secondary_text,
                     icon,
