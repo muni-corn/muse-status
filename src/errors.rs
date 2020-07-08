@@ -3,6 +3,9 @@ use std::fmt;
 use std::num::ParseIntError;
 use std::io::Error as IoError;
 use crate::format::color::RGBAParseError;
+use crate::format::blocks::output::BlockOutput;
+use std::error::Error;
+use std::sync::mpsc::SendError;
 
 /// Wraps a number of errors that could be encountered throughout muse-status.
 #[derive(Debug)]
@@ -24,6 +27,14 @@ pub enum MuseStatusError {
 
     /// Wraps an error from parsing colors.
     RGBAParse(RGBAParseError),
+}
+
+impl From<serde_json::error::Error> for MuseStatusError {
+    fn from(e: serde_json::error::Error) -> Self {
+        Self::Basic(BasicError {
+            message: format!("problem with serialization: {}", e)
+        })
+    }
 }
 
 impl From<ParseIntError> for MuseStatusError {
@@ -75,6 +86,8 @@ impl Display for MuseStatusError {
     }
 }
 
+impl Error for MuseStatusError {}
+
 /// A simple error with a single message.
 #[derive(Debug)]
 pub struct BasicError {
@@ -87,6 +100,8 @@ impl Display for BasicError {
         write!(f, "muse-status encountered an error: {}", self.message)
     }
 }
+
+impl Error for BasicError {}
 
 /// UpdateError is returned when a Block fails to update for any reason. The block name and message
 /// are given to give the user (or developer) information about where and why an error happened
@@ -105,3 +120,14 @@ impl Display for UpdateError {
         write!(f, "couldn't update {}: {}", self.block_name, self.message)
     }
 }
+
+impl From<SendError<BlockOutput>> for UpdateError {
+    fn from(e: SendError<BlockOutput>) -> Self {
+        Self {
+            block_name: e.0.block_name,
+            message: format!("data couldn't be sent: {:?}", e.0.body),
+        }
+    }
+}
+
+impl Error for UpdateError {}

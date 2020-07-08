@@ -81,14 +81,14 @@ impl Block for BrightnessBlock {
         None
     }
 
-    fn output(&self) -> Option<BlockOutputBody> {
+    fn output(&self) -> Option<BlockOutputContent> {
         if self.max_brightness == 0 {
             return None;
         }
 
         let percent = self.current_brightness * 100 / self.max_brightness;
         let icon = get_icon(percent as u32);
-        Some(BlockOutputBody::from(crate::format::bit::Bit {
+        Some(BlockOutputContent::from(crate::format::bit::Bit {
             text: format!("{}  {}%", icon, percent),
             color: Some(Color::Secondary),
             font: None,

@@ -3,7 +3,7 @@ pub mod output;
 
 use crate::errors::UpdateError;
 use crate::format;
-use output::BlockOutputBody;
+use output::{BlockOutput, BlockOutputContent};
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -48,7 +48,7 @@ pub trait Block: Send + Sync {
                     if let Err(e) = block.update() {
                         println!("{}", e)
                     }
-                    let _ = block_sender.send(block.output());
+                    let _ = block_sender.send(BlockOutput::new(block.name(), block.output()));
 
                     block.next_update_time()
                 };
@@ -69,8 +69,8 @@ pub trait Block: Send + Sync {
                 while let Ok(name) = notify_rx.recv() {
                     let mut block = arc_clone.lock().unwrap();
                     if name == block.name() {
-                        block.update();
-                        sender_clone.send(BlockOutputBody::new(block.name(), block.output()));
+                        let _ = block.update();
+                        sender_clone.send(BlockOutput::new(block.name(), block.output())).unwrap();
                     }
                 }
             })
@@ -91,7 +91,7 @@ pub trait Block: Send + Sync {
 
     /// Output returns Some BlockOutputBody, or None. If None, the Block is hidden from the status
     /// bar. If Some, the block is updated in the status bar.
-    fn output(&self) -> Option<BlockOutputBody>;
+    fn output(&self) -> Option<BlockOutputContent>;
 
     /// Returns the name of the block, which is used as a sort of key in the status bar. It's used
     /// to update blocks in the status bar.

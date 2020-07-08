@@ -1,11 +1,11 @@
 use super::Mode;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
-use serde::{Deserialize, Serialize};
 
 /// Color doesn't represent colors as numbers; instead, it is an enum for types of
 /// colors encountered in muse-status.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum Color {
     /// The primary color.
     Primary,
@@ -24,7 +24,7 @@ pub enum Color {
 }
 
 /// Represents an RGBA color using bytes, each 0 - 255.
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RGBA {
     /// Red.
     pub r: u8,

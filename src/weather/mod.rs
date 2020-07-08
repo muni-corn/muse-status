@@ -231,9 +231,9 @@ impl Block for WeatherBlock {
         "weather"
     }
 
-    fn output(&self) -> Option<BlockOutputBody> {
+    fn output(&self) -> Option<BlockOutputContent> {
         if let Some(r) = &self.current_report {
-            Some(BlockOutputBody::from(NiceOutput {
+            Some(BlockOutputContent::from(NiceOutput {
                 attention: Attention::Normal,
                 icon: self.get_weather_icon(r),
                 primary_text: self.get_temperature_string().unwrap_or_else(|| "".to_string()),
