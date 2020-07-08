@@ -158,9 +158,9 @@ impl Block for NetworkBlock {
         Some(self.next_update_time)
     }
 
-    fn output(&self) -> Option<BlockOutputBody> {
+    fn output(&self) -> Option<BlockOutputContent> {
         match &self.status {
-            NetworkStatus::Connected => Some(BlockOutputBody::from(NiceOutput {
+            NetworkStatus::Connected => Some(BlockOutputContent::from(NiceOutput {
                 attention: Attention::Normal,
                 icon: self.get_icon(),
                 primary_text: self.ssid.clone().unwrap_or_else(String::new),

@@ -78,9 +78,9 @@ impl Block for DateBlock {
         Some(self.next_update)
     }
 
-    fn output(&self) -> Option<BlockOutputBody> {
+    fn output(&self) -> Option<BlockOutputContent> {
         let icon_index = self.now.hour() % 12;
-        Some(BlockOutputBody::from(NiceOutput {
+        Some(BlockOutputContent::from(NiceOutput {
             icon: CLOCK_ICONS[icon_index as usize],
             primary_text: format!("{}", self.now.format(TIME_FORMAT)),
             secondary_text: Some(format!("{}", self.now.format(DATE_FORMAT))),

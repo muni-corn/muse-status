@@ -1,15 +1,14 @@
 use crate::errors::*;
-use crate::format::blocks::output::{BlockOutput, BlockOutputBody, NiceOutput};
+use crate::format::blocks::output::{BlockOutput, BlockOutputContent, NiceOutput};
 use crate::format::blocks::Block;
 use crate::format::Attention;
+use mpris as mpris_lib;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
-use mpris as mpris_lib;
 
-
-/// A block that displays information about any media currently playing on the device. 
+/// A block that displays information about any media currently playing on the device.
 pub struct MprisBlock {
     next_update_time: chrono::DateTime<chrono::Local>,
 
@@ -62,6 +61,59 @@ impl MprisBlock {
             None
         };
     }
+
+    fn main_loop(
+        mutex: Arc<Mutex<Box<Self>>>,
+        block_sender: Sender<BlockOutput>,
+    ) -> Result<(), MuseStatusError> {
+        let player = loop {
+            thread::sleep(std::time::Duration::from_secs(5));
+
+            if let Ok(player_finder) = mpris_lib::PlayerFinder::new() {
+                if let Ok(player) = player_finder.find_active() {
+                    break player;
+                }
+            }
+        };
+
+        {
+            let mut block = mutex.lock().unwrap();
+            let metadata = player.get_metadata().map_err(|e| UpdateError {
+                block_name: block.name().to_owned(),
+                message: format!("{}", e),
+            })?;
+            block.set_metadata(metadata);
+            block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
+        }
+
+        if let Ok(mut events) = player.events() {
+            while let Some(Ok(e)) = events.next() {
+                // update the player data, then send the update
+                let mut block = mutex.lock().unwrap();
+
+                match e {
+                    // update the block depending on the Event
+                    mpris_lib::Event::Playing => block.status = PlayerStatus::Playing,
+                    mpris_lib::Event::Paused => block.status = PlayerStatus::Paused,
+                    mpris_lib::Event::Stopped | mpris_lib::Event::PlayerShutDown => {
+                        block.status = PlayerStatus::Stopped
+                    }
+                    mpris_lib::Event::TrackChanged(m) => block.set_metadata(m),
+                    _ => (),
+                }
+
+                block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
+            }
+        }
+
+        {
+            let mut block = mutex.lock().unwrap();
+            block.status = PlayerStatus::Stopped;
+            block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
+        }
+
+        Ok(())
+    }
 }
 
 impl Block for MprisBlock {
@@ -74,51 +126,12 @@ impl Block for MprisBlock {
         let (notify_tx, _) = std::sync::mpsc::channel::<String>();
 
         let mutex = Arc::new(Mutex::new(self));
-        let player_listen_handle = thread::Builder::new().name(String::from("mpris player listener")).spawn(move || loop {
-            let player = loop {
-                thread::sleep(std::time::Duration::from_secs(5));
-
-                if let Ok(player_finder) = mpris_lib::PlayerFinder::new() {
-                    if let Ok(player) = player_finder.find_active() {
-                        break player
-                    }
-                }
-            };
-
-            {
-                let metadata = player.get_metadata().unwrap();
-                let mut block = mutex.lock().unwrap();
-                block.set_metadata(metadata);
-                block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
-            }
-
-
-            if let Ok(mut events) = player.events() {
-                while let Some(Ok(e)) = events.next() {
-                    // update the player data, then send the update
-                    let mut block = mutex.lock().unwrap();
-
-                    match e {
-                        // update the block depending on the Event
-                        mpris_lib::Event::Playing => block.status = PlayerStatus::Playing,
-                        mpris_lib::Event::Paused => block.status = PlayerStatus::Paused,
-                        mpris_lib::Event::Stopped | mpris_lib::Event::PlayerShutDown => block.status = PlayerStatus::Stopped,
-                        mpris_lib::Event::TrackChanged(m) => block.set_metadata(m),
-                        _ => (),
-                    }
-
-                    block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
-                }
-            }
-
-            {
-                let mut block = mutex.lock().unwrap();
-                block.status = PlayerStatus::Stopped;
-                block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
-            }
-
-        }).unwrap();
-
+        let player_listen_handle = thread::Builder::new()
+            .name(String::from("mpris player listener"))
+            .spawn(move || loop {
+                let _ = Self::main_loop(mutex.clone(), block_sender.clone());
+            })
+            .unwrap();
 
         (vec![player_listen_handle], notify_tx)
     }
@@ -135,15 +148,15 @@ impl Block for MprisBlock {
         Some(self.next_update_time)
     }
 
-    fn output(&self) -> Option<BlockOutputBody> {
+    fn output(&self) -> Option<BlockOutputContent> {
         match self.status {
             PlayerStatus::Stopped => None,
-            _ => Some(BlockOutputBody::from(NiceOutput {
+            _ => Some(BlockOutputContent::from(NiceOutput {
                 primary_text: self.title.clone().unwrap_or_else(String::new),
                 secondary_text: self.artist.clone(),
                 icon: self.get_icon(),
                 attention: Attention::Normal,
-            }))
+            })),
         }
     }
 }

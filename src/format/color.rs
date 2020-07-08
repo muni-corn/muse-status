@@ -1,9 +1,11 @@
 use super::Mode;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
 /// Color doesn't represent colors as numbers; instead, it is an enum for types of
 /// colors encountered in muse-status.
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum Color {
     /// The primary color.
     Primary,
@@ -22,7 +24,7 @@ pub enum Color {
 }
 
 /// Represents an RGBA color using bytes, each 0 - 255.
-#[derive(Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RGBA {
     /// Red.
     pub r: u8,
@@ -105,14 +107,10 @@ impl RGBA {
     /// the mode that muse-status is in
     pub fn hex_string(&self, mode: Mode) -> String {
         match mode {
-            Mode::Lemonbar => format!(
-                "{:x}",
-                u32::from_be_bytes([self.a, self.r, self.g, self.b])
-            ),
-            Mode::JsonProtocol => format!(
-                "{:x}",
-                u32::from_be_bytes([self.r, self.g, self.b, self.a])
-            ),
+            Mode::Lemonbar => format!("{:x}", u32::from_be_bytes([self.a, self.r, self.g, self.b])),
+            Mode::JsonProtocol => {
+                format!("{:x}", u32::from_be_bytes([self.r, self.g, self.b, self.a]))
+            }
         }
     }
 }

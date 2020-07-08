@@ -206,7 +206,7 @@ impl Block for SmartBatteryBlock {
         "battery"
     }
 
-    fn output(&self) -> Option<BlockOutputBody> {
+    fn output(&self) -> Option<BlockOutputContent> {
         match &self.current_read {
             Some(current_read) => {
                 let now = Local::now();
@@ -214,36 +214,34 @@ impl Block for SmartBatteryBlock {
 
                 let primary_text = match current_read.status {
                     ChargeStatus::Full => String::from("Full"),
-                    _ => format!("{}%", percent)
+                    _ => format!("{}%", percent),
                 };
 
                 let secondary_text = match current_read.status {
                     ChargeStatus::Full => Some(String::from("Plugged in")),
-                    _ => {
-                        match self.get_completion_time() {
-                            Some(completion_time) => {
-                                let minutes_left = (completion_time - now).num_minutes();
-                                if minutes_left <= 0 {
-                                    None
-                                } else if minutes_left <= 30 {
-                                    Some(format!("{} min left", minutes_left))
-                                } else {
-                                    let prefix = match &current_read.status {
-                                        ChargeStatus::Charging => "Full at",
-                                        ChargeStatus::Discharging => "Until",
-                                        _ => "",
-                                    };
+                    _ => match self.get_completion_time() {
+                        Some(completion_time) => {
+                            let minutes_left = (completion_time - now).num_minutes();
+                            if minutes_left <= 0 {
+                                None
+                            } else if minutes_left <= 30 {
+                                Some(format!("{} min left", minutes_left))
+                            } else {
+                                let prefix = match &current_read.status {
+                                    ChargeStatus::Charging => "Full at",
+                                    ChargeStatus::Discharging => "Until",
+                                    _ => "",
+                                };
 
-                                    Some(format!(
-                                            "{} {}",
-                                            prefix,
-                                            completion_time.format(TIME_FORMAT)
-                                    ))
-                                } 
+                                Some(format!(
+                                    "{} {}",
+                                    prefix,
+                                    completion_time.format(TIME_FORMAT)
+                                ))
                             }
-                            None => None,
                         }
-                    }
+                        None => None,
+                    },
                 };
 
                 let icon = match &self.current_read {
@@ -268,14 +266,14 @@ impl Block for SmartBatteryBlock {
                     Attention::Normal
                 };
 
-                Some(BlockOutputBody::Nice(NiceOutput {
+                Some(BlockOutputContent::Nice(NiceOutput {
                     primary_text,
                     secondary_text,
                     icon,
                     attention,
                 }))
-            },
-            None => None
+            }
+            None => None,
         }
     }
 
@@ -305,32 +303,26 @@ impl Block for SmartBatteryBlock {
             }
         };
 
-        match &self.current_read {
-            Some(current_read) => {
-                match &self.last_read {
-                    Some(last_read) => {
-                        if current_read.status != last_read.status || self.last_read.is_none() {
-                        } else if current_read.at - last_read.at >= Duration::seconds(5)
-                            && current_read.charge - last_read.charge != 0
-                                && (current_read.status == ChargeStatus::Charging
-                                    || current_read.status == ChargeStatus::Discharging)
-                        {
-                            let time_diff_ns: i64 =
-                                (current_read.at - last_read.at).num_nanoseconds().unwrap();
-                            let charge_diff: i64 = (current_read.charge - last_read.charge).into();
+        if let Some(current_read) = &self.current_read {
+            if let Some(last_read) = &self.last_read {
+                if current_read.status == last_read.status
+                    && current_read.at - last_read.at >= Duration::seconds(5)
+                    && current_read.charge - last_read.charge != 0
+                    && (current_read.status == ChargeStatus::Charging
+                        || current_read.status == ChargeStatus::Discharging)
+                {
+                    if let Some(time_diff_ns) = (current_read.at - last_read.at).num_nanoseconds() {
+                        let charge_diff: i64 = (current_read.charge - last_read.charge).into();
 
-                            // calculate new rate in nanoseconds per charge unit
-                            let rate_now = time_diff_ns / charge_diff;
+                        // calculate new rate in nanoseconds per charge unit
+                        let rate_now = time_diff_ns / charge_diff;
 
-                            self.calculate_new_rate(rate_now as f32);
+                        self.calculate_new_rate(rate_now as f32);
 
-                            self.last_read = self.current_read.clone();
-                        }
+                        self.last_read = self.current_read.clone();
                     }
-                    None => {}
                 }
             }
-            None => {}
         }
 
         self.last_read = self.current_read.clone();
@@ -372,62 +364,60 @@ fn get_battery_icon(status: &ChargeStatus, percentage: i32) -> char {
                 .min(DISCHARGING_ICONS.len() - 1);
             DISCHARGING_ICONS[discharging_index as usize]
         }
-        ChargeStatus::Full => {
-            FULL_ICON
-        }
+        ChargeStatus::Full => FULL_ICON,
         _ => UNKNOWN_ICON,
     }
 }
 
 /*  DATA FILE FORMAT
 
-    data recorded like so:
-    key %/hour records
+data recorded like so:
+key %/hour records
 
-    where "records" is the amount of times the parameter has been recorded.
-    used for recording a new average based on the current average and how
-    many times the parameter has been recorded before
-    for example:
+where "records" is the amount of times the parameter has been recorded.
+used for recording a new average based on the current average and how
+many times the parameter has been recorded before
+for example:
 
-    C 3.14159 200
+C 3.14159 200
 
-    --- BEGIN FILE EXAMPLE ------------------------------------------------
+--- BEGIN FILE EXAMPLE ------------------------------------------------
 
-    C			| charging avg
-    C0			|
-    C1  		        |
-    C2			| charging values by percentage
-    ...			|
-    C9			|
+C			| charging avg
+C0			|
+C1  		        |
+C2			| charging values by percentage
+...			|
+C9			|
 
-    D			| discharging avg
-    D0			|
-    D1			|
-    D2			| discharging avg values by hour of day
-    ...			| (used for predicting nonexistent day-by-day values)
-    D23			|
+D			| discharging avg
+D0			|
+D1			|
+D2			| discharging avg values by hour of day
+...			| (used for predicting nonexistent day-by-day values)
+D23			|
 
-    S0			| sunday
-    S1			|
-    S2			| discharging values by hour by day of week
-    ...			|
-    S23			|
+S0			| sunday
+S1			|
+S2			| discharging values by hour by day of week
+...			|
+S23			|
 
-    M0			| monday
-    ...                     |
+M0			| monday
+...                     |
 
-    T0			| thursday
-    ...                     |
+T0			| thursday
+...                     |
 
-    W0			| wednesday
-    ...                     |
+W0			| wednesday
+...                     |
 
-    R0			| thursday
-    ...                     |
+R0			| thursday
+...                     |
 
-    F0			| friday
-    ...                     |
+F0			| friday
+...                     |
 
-    A0			| saturday
-    ...                     |
-    */
+A0			| saturday
+...                     |
+*/
