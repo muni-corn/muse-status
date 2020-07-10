@@ -26,9 +26,10 @@ fn main() {
 
     // start loop. muse-status will try listening for the daemon again if it is disconnected
     let mut stream = get_daemon_connection();
-    stream
-        .write_all(format!("{}\n", serde_json::to_string(&action).unwrap()).as_bytes())
-        .unwrap();
+    if let Err(e) = stream.write_all(format!("{}\n", serde_json::to_string(&action).unwrap()).as_bytes()) {
+        eprintln!("{}", e);
+        return
+    }
 
     if let ClientMsg::Connect = action {
         // the client will connect to the daemon and output data updates.
