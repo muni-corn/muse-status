@@ -75,6 +75,7 @@ impl Daemon {
         let mut thread_handles: Vec<JoinHandle<()>> = Vec::new();
 
         // start status blocks
+        println!("starting all blocks...");
         let (mut block_handles, update_request_senders) = self.start_all_blocks(block_tx, primary_blocks, secondary_blocks, tertiary_blocks);
         self.notify_senders = update_request_senders;
         thread_handles.append(&mut block_handles);
@@ -144,6 +145,8 @@ impl Daemon {
         all.append(&mut tertiary_blocks);
 
         while let Some(b) = all.pop() {
+            println!("==> starting '{}'...", b.name());
+
             let (mut handle_vec, sender) = b.run(sender.clone());
 
             handles.append(&mut handle_vec);
@@ -161,7 +164,7 @@ impl Daemon {
                 Ok(conn) => {
                     if let Err(e) = Self::handle_connection(daemon_arc.clone(), conn) {
                         eprintln!(
-                            "there was a problem handling a connection to the daemon: {}",
+                            "there was a problem handling a connection to the daemon ({}), but the daemon will keep running",
                             e
                         );
                     }
@@ -223,10 +226,12 @@ impl Daemon {
 
         let mut buf_reader = std::io::BufReader::new(conn.try_clone()?);
         let mut raw_action = String::new();
+
+        // TODO XXX This is probably our issue! This call will block if the client doesn't send
+        // anything. Move this and all following into a separate thread (maybe)?
         buf_reader.read_line(&mut raw_action)?;
 
-        let action: ClientMsg = serde_json::from_str(raw_action.as_str()).unwrap();
-
+        let action = serde_json::from_str(raw_action.as_str()).map_err(MuseStatusError::from)?;
         if let ClientMsg::Command(c) = &action {
             println!("handling command from client: {}", c);
             daemon.handle_client_command(c)?;
