@@ -70,7 +70,9 @@ pub trait Block: Send + Sync {
                     let mut block = arc_clone.lock().unwrap();
                     if name == block.name() {
                         let _ = block.update();
-                        sender_clone.send(BlockOutput::new(block.name(), block.output())).unwrap();
+                        sender_clone
+                            .send(BlockOutput::new(block.name(), block.output()))
+                            .unwrap();
                     }
                 }
             })

@@ -77,7 +77,9 @@ pub struct NiceOutput {
 }
 
 impl NiceOutput {
-    /// Formats the output as a pango string.
+    /// Formats the output as a pango string. The first string returned is the full text including
+    /// icon, primary text, and secondary text. The second string is the same but excludes the
+    /// secondary text.
     pub fn as_pango_strings(&self, f: &Formatter) -> (String, String) {
         let (primary_color, secondary_color) = match &self.attention {
             Attention::Normal => (f.primary_color.clone(), f.secondary_color.clone()),
