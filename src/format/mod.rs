@@ -11,6 +11,7 @@ pub mod color;
 
 use crate::daemon::DataOutput;
 use crate::format::blocks::output::{BlockOutput, BlockOutputContent};
+use crate::errors::MuseStatusError;
 use crate::utils;
 use color::{Color, RGBA};
 use serde::{Deserialize, Serialize};
@@ -263,6 +264,22 @@ impl Formatter {
             Color::Secondary => self.secondary_color.clone(),
             Color::Other(rgba) => rgba.clone(),
         }
+    }
+
+    /// Sets the Formatter's mode from the string `s`. j
+    pub fn set_mode_from_str(&mut self, s: &str) -> Result<(), MuseStatusError> {
+        Ok(match s {
+            "i3" => {
+                self.set_format_mode(Mode::JsonProtocol);
+            }
+            "lemon" => {
+                self.set_format_mode(Mode::Lemonbar);
+            }
+            "plain" | "markup" => {
+                self.set_format_mode(Mode::Markup);
+            }
+            _ => unimplemented!(),
+        })
     }
 
     /// Formats the BlockOutput for the i3 JSON protocol. None if body is None.
