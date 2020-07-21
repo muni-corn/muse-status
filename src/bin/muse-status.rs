@@ -1,5 +1,5 @@
 use muse_status::daemon::{ClientMsg, DataOutput};
-use muse_status::errors::MuseStatusError;
+use muse_status::errors::{BasicError, MuseStatusError};
 use muse_status::format::{Formatter, Mode};
 use std::env;
 use std::error::Error;
@@ -26,9 +26,11 @@ fn main() {
 
     // start loop. muse-status will try listening for the daemon again if it is disconnected
     let mut stream = get_daemon_connection();
-    if let Err(e) = stream.write_all(format!("{}\n", serde_json::to_string(&action).unwrap()).as_bytes()) {
+    if let Err(e) =
+        stream.write_all(format!("{}\n", serde_json::to_string(&action).unwrap()).as_bytes())
+    {
         eprintln!("{}", e);
-        return
+        return;
     }
 
     if let ClientMsg::Connect = action {
@@ -112,10 +114,17 @@ fn formatter_from_flags(flags: &[String]) -> Result<Formatter, MuseStatusError> 
                     "lemon" => {
                         formatter.set_format_mode(Mode::Lemonbar);
                     }
+                    "plain" | "markup" => {
+                        formatter.set_format_mode(Mode::Markup);
+                    }
                     _ => unimplemented!(),
                 },
                 _ => unimplemented!(),
             }
+        } else {
+            return Err(MuseStatusError::from(BasicError {
+                message: format!("flag requires a value: {}", flag),
+            }));
         }
     }
 
