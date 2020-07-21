@@ -9,7 +9,8 @@ pub struct BlockOutput {
     /// The name of the original block.
     pub block_name: String,
 
-    /// The body of the BlockOutput, optional. If None, the output is removed.
+    /// The body of the BlockOutput, optional. If None, the display of this output should be
+    /// removed.
     pub body: Option<BlockOutputContent>,
 }
 

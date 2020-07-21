@@ -95,31 +95,12 @@ fn formatter_from_flags(flags: &[String]) -> Result<Formatter, MuseStatusError> 
     while let Some(flag) = iter.next() {
         if let Some(value) = iter.next() {
             match flag.as_str() {
-                "-p" | "--primary-color" => {
-                    formatter.set_primary_color(&value)?;
-                }
-                "-s" | "--secondary-color" => {
-                    formatter.set_secondary_color(&value)?;
-                }
-                "-f" | "--font" => {
-                    formatter.set_text_font(&value);
-                }
-                "-i" | "--icon-font" => {
-                    formatter.set_icon_font(&value);
-                }
-                "-m" | "--mode" => match value.as_str() {
-                    "i3" => {
-                        formatter.set_format_mode(Mode::JsonProtocol);
-                    }
-                    "lemon" => {
-                        formatter.set_format_mode(Mode::Lemonbar);
-                    }
-                    "plain" | "markup" => {
-                        formatter.set_format_mode(Mode::Markup);
-                    }
-                    _ => unimplemented!(),
-                },
-                _ => unimplemented!(),
+                "-p" | "--primary-color" => formatter.set_primary_color(&value)?,
+                "-s" | "--secondary-color" => formatter.set_secondary_color(&value)?,
+                "-f" | "--font" => formatter.set_text_font(&value),
+                "-i" | "--icon-font" => formatter.set_icon_font(&value),
+                "-m" | "--mode" => formatter.set_mode_from_str(&value)?,
+                _ => (),
             }
         } else {
             return Err(MuseStatusError::from(BasicError {
