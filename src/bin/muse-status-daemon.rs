@@ -17,7 +17,7 @@ fn main() {
     let battery_block = battery::SmartBatteryBlock::new("BAT0", 30, 15);
     let brightness_block = brightness::BrightnessBlock::new("amdgpu_bl0");
     let date_block = date::DateBlock::new();
-    let network_block = match network::NetworkBlock::new("wlo1") {
+    let network_block = match network::NetworkBlock::new("wlan0") {
         Ok(n) => n,
         Err(e) => {
             eprintln!("couldn't create network block: {}", e);
