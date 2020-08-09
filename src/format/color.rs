@@ -108,9 +108,8 @@ impl RGBA {
     pub fn hex_string(&self, mode: Mode) -> String {
         match mode {
             Mode::Lemonbar => format!("{:x}", u32::from_be_bytes([self.a, self.r, self.g, self.b])),
-            Mode::JsonProtocol => {
-                format!("{:x}", u32::from_be_bytes([self.r, self.g, self.b, self.a]))
-            }
+            Mode::JsonProtocol => format!("{:x}", u32::from_be_bytes([self.r, self.g, self.b, self.a])),
+            Mode::Markup => format!("{:x}", u32::from_be_bytes([self.r, self.g, self.b, self.a]))
         }
     }
 }

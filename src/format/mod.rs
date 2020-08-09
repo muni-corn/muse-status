@@ -11,14 +11,12 @@ pub mod color;
 
 use crate::daemon::DataOutput;
 use crate::format::blocks::output::{BlockOutput, BlockOutputContent};
-use crate::errors::MuseStatusError;
+use crate::errors::{MuseStatusError, BasicError};
 use crate::utils;
 use color::{Color, RGBA};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::str::FromStr;
-use std::sync::mpsc;
 
 const MARKUP_SEPARATOR: &str = "    ";
 
@@ -69,14 +67,8 @@ pub struct Formatter {
     text_font: String,
     icon_font: String,
 
-    /// Stores outputs of blocks.
-    outputs: HashMap<String, blocks::output::BlockOutputContent>,
-
     /// A banner queue.
     banners: VecDeque<Banner>,
-
-    /// Sends outputs, if Some.
-    output_sender: Option<mpsc::Sender<String>>,
 }
 
 /// The output of a Banner.
@@ -127,11 +119,7 @@ impl Default for Formatter {
             text_font: String::from("Roboto 10"),
             icon_font: String::from("Material Design Icons 12"),
 
-            outputs: HashMap::new(),
-
             banners: VecDeque::new(),
-
-            output_sender: None,
         }
     }
 }
@@ -268,7 +256,7 @@ impl Formatter {
 
     /// Sets the Formatter's mode from the string `s`. j
     pub fn set_mode_from_str(&mut self, s: &str) -> Result<(), MuseStatusError> {
-        Ok(match s {
+        match s {
             "i3" => {
                 self.set_format_mode(Mode::JsonProtocol);
             }
@@ -278,8 +266,12 @@ impl Formatter {
             "plain" | "markup" => {
                 self.set_format_mode(Mode::Markup);
             }
-            _ => unimplemented!(),
-        })
+            _ => return Err(MuseStatusError::from(BasicError {
+                message: format!("this format isn't recognized: `{}`", s),
+            }))
+        }
+
+        Ok(())
     }
 
     /// Formats the BlockOutput for the i3 JSON protocol. None if body is None.
@@ -332,4 +324,14 @@ struct JsonBlock {
     short_text: String,
     separator: bool,
     markup: String,
+}
+
+/// Sorta like endianness; specifies if most important blocks (i.e. primary blocks) should start
+/// from the right or the left.
+pub enum SingleLineImportanceDirection {
+    /// Right-to-left, most important first.
+    Ascending,
+
+    /// Left-to-right, most important first.
+    Descending
 }
