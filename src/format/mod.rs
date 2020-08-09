@@ -10,14 +10,16 @@ pub mod color;
 // TODO create a separate module for Banner
 
 use crate::daemon::DataOutput;
+use crate::format::blocks::output::{BlockOutput, BlockOutputContent};
 use crate::utils;
 use color::{Color, RGBA};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::mpsc;
-use serde::{Deserialize, Serialize};
-use crate::format::blocks::output::{BlockOutputContent, BlockOutput};
+
+const MARKUP_SEPARATOR: &str = "    ";
 
 /// Attention provides a way to easily apply colors to a Block, without actually passing any RGBA
 /// values.
@@ -51,6 +53,9 @@ pub enum Mode {
 
     /// i3-compatabile output.
     JsonProtocol,
+
+    /// Plain markup output.
+    Markup,
 }
 
 /// Fonts, colors and more for muse-status
@@ -156,6 +161,21 @@ impl Formatter {
                 format!(",[{}]", joined)
             }
             Mode::Lemonbar => unimplemented!(),
+            Mode::Markup => {
+                let mut string_outputs = Vec::new();
+
+                for block_output in data
+                    .tertiary
+                    .iter()
+                    .chain(data.secondary.iter().chain(data.primary.iter().rev()))
+                {
+                    if let Some(m) = self.block_output_as_markup(block_output) {
+                        string_outputs.push(m)
+                    }
+                }
+
+                string_outputs.join(MARKUP_SEPARATOR)
+            }
         }
     }
 
@@ -164,6 +184,7 @@ impl Formatter {
         match self.formatting_mode {
             Mode::JsonProtocol => unimplemented!(),
             Mode::Lemonbar => unimplemented!(),
+            Mode::Markup => unimplemented!(),
         }
     }
 
@@ -192,15 +213,6 @@ impl Formatter {
         self.icon_font = font.to_owned();
     }
 
-    // // module_separator returns something that separates modules
-    // // (spaces in Lemonbar mode, comma in i3 mode)
-    // fn module_separator<'a>(&self) -> &'a str {
-    //     match self.formatting_mode {
-    //         Mode::JsonProtocol => ",",
-    //         _ => "    ",
-    //     }
-    // }
-
     /// Sets the primary color of the Formatting
     pub fn set_primary_color(&mut self, color: &str) -> Result<(), color::RGBAParseError> {
         Self::set_color(&mut self.primary_color, color)
@@ -216,17 +228,6 @@ impl Formatter {
 
         Ok(())
     }
-
-    // Returns the original text wrapped in a clickable
-    // area
-    // fn action(&self, action: &str, original: &str) -> String {
-    //     if self.formatting_mode == Mode::JsonProtocol {
-    //         return original.to_string();
-    //     }
-    //     let s = format!("%{{A:{}:}}{}%{{A}}", action, original);
-
-    //     s
-    // }
 
     fn get_pulse_color(&self, color: &RGBA, seconds: f32) -> RGBA {
         use std::time::Duration;
@@ -292,12 +293,20 @@ impl Formatter {
             None
         }
     }
-}
 
-// /// Returns 4 spaces as a separator between data.
-// fn separator<'a>() -> &'a str {
-//     "    "
-// }
+    /// Formats the BlockOutput for plain markup output.
+    fn block_output_as_markup(&self, b: &BlockOutput) -> Option<String> {
+        if let Some(body) = &b.body {
+            Some(match body {
+                BlockOutputContent::Nice(n) => n.as_pango_strings(self).0,
+                BlockOutputContent::SingleBit(b) => b.as_pango_string(self),
+                BlockOutputContent::Custom(c) => c.clone(),
+            })
+        } else {
+            None
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct JsonBlock {
