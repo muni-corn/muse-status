@@ -9,20 +9,7 @@ use std::io::Write;
 use std::net::TcpStream;
 
 fn main() {
-    let action = if let Some(first_arg) = env::args().nth(1) {
-        let s = env::args().skip(1).collect::<Vec<String>>().join(" ");
-        if let Some(first_char) = first_arg.chars().next() {
-            if first_char == '-' {
-                ClientMsg::Connect
-            } else {
-                ClientMsg::Command(s)
-            }
-        } else {
-            ClientMsg::Connect
-        }
-    } else {
-        ClientMsg::Connect
-    };
+    let action = ClientMsg::from_env();
 
     // start loop. muse-status will try listening for the daemon again if it is disconnected
     let mut stream = get_daemon_connection();
@@ -33,7 +20,7 @@ fn main() {
         return;
     }
 
-    if let ClientMsg::Connect = action {
+    if let ClientMsg::Subscribe(_) = action {
         // the client will connect to the daemon and output data updates.
 
         // get the formatter
