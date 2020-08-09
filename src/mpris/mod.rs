@@ -120,10 +120,10 @@ impl Block for MprisBlock {
     fn run(
         self: Box<Self>,
         block_sender: Sender<BlockOutput>,
-    ) -> (Vec<JoinHandle<()>>, Sender<String>) {
+    ) -> (Vec<JoinHandle<()>>, Sender<()>) {
         // This might seem dumb, but MprisBlock updates are dependent on updates from the mpris
         // client, so it will not listen to any "notify" requests
-        let (notify_tx, _) = std::sync::mpsc::channel::<String>();
+        let (notify_tx, _) = std::sync::mpsc::channel::<()>();
 
         let mutex = Arc::new(Mutex::new(self));
         let player_listen_handle = thread::Builder::new()
