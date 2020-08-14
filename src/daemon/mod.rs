@@ -149,7 +149,7 @@ impl Daemon {
                 .block_outputs
                 .insert(output.block_name.clone(), output.clone());
 
-            if let Err(e) = daemon.send_output_update(output) {
+            if let Err(e) = daemon.send_output_update_to_all(output) {
                 eprintln!("there was an error: {}", e)
             }
         }
@@ -158,7 +158,6 @@ impl Daemon {
     /// Should be run within a separate thread. `self` should NOT be a parameter, as a mutex would
     /// be locked for the entirety of this never-ending function.
     fn listen_for_banners(_daemon_arc: DaemonMutexArc, _banner_rx: Receiver<format::Banner>) {
-        // unimplemented!()
         // while let Ok(_) = banner_rx.recv() {
         //     let _ = daemon_arc.lock().unwrap().send_data_to_all();
         // }
@@ -211,29 +210,22 @@ impl Daemon {
     }
 
     /// Sends data updates to subscribers.
-    fn send_output_update(&mut self, new_block_output: BlockOutput) -> Result<(), MuseStatusError> {
+    fn send_output_update_to_all(&mut self, new_block_output: BlockOutput) -> Result<(), MuseStatusError> {
         let iter = self.subscribers.iter_mut();
         let serialized_output = serde_json::to_string(&new_block_output)?;
 
         for sub in iter {
-            Self::send_serialized_data(sub, &serialized_output)?;
+            send_serialized_data(sub, &serialized_output)?;
         }
 
         Ok(())
     }
 
-    fn send_serialized_data(
-        sub: &mut Subscriber,
-        serialized_data: &str,
-    ) -> Result<(), MuseStatusError> {
-        sub.stream()
-            .write_all(serialized_data.as_bytes())
-            .map_err(MuseStatusError::from)
-    }
-
     /// Sends all data requested by the subscriber, usually to initialize it.
-    fn force_send_data(&self, _sub: &mut Subscriber) {
-        unimplemented!()
+    fn force_send_data(&self, sub: &mut Subscriber) -> Result<(), MuseStatusError> {
+        let all_outputs = self.block_outputs.iter().map(|t| t.1.to_owned()).collect::<Vec<BlockOutput>>();
+        let msg = DaemonMsg::AllData(all_outputs);
+        send_serialized_data(sub, &serde_json::to_string(&msg)?)
     }
 
     fn update_collection(&mut self, collection: &Collection) {
@@ -308,6 +300,7 @@ pub enum Collection {
 pub enum DaemonMsg {
     /// New output to be sent to clients
     NewOutput(BlockOutput),
+    AllData(Vec<BlockOutput>),
 }
 
 /// A collection of outputs from blocks to be formatted
@@ -410,4 +403,13 @@ fn is_block_name_in_collection(block_name: &str, collection: &Collection) -> boo
         Collection::One(b) => b == block_name,
         Collection::Many(v) => v.iter().any(|n| n == block_name),
     }
+}
+
+fn send_serialized_data(
+    sub: &mut Subscriber,
+    serialized_data: &str,
+) -> Result<(), MuseStatusError> {
+    sub.stream()
+        .write_all(serialized_data.as_bytes())
+        .map_err(MuseStatusError::from)
 }
