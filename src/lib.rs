@@ -10,7 +10,10 @@ pub mod battery;
 /// The brightness block module.
 pub mod brightness;
 
-/// The daemon module.
+/// The client module, used by the muse-status executable.
+pub mod client;
+
+/// The daemon module, used by the muse-status-daemon executable.
 pub mod daemon;
 
 /// The date block module.
