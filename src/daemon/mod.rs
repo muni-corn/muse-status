@@ -1,10 +1,10 @@
+use crate::client::ClientMsg;
 use crate::errors::*;
 use crate::format;
 use crate::format::blocks::output::BlockOutput;
 use crate::format::blocks::Block;
-use crate::format::Banner;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::io::BufRead;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
@@ -15,35 +15,7 @@ use std::thread;
 use std::thread::JoinHandle;
 
 type BlockVec = Vec<Box<dyn Block>>;
-type BlockSlice<'a> = &'a [Box<dyn Block>];
-type BlockNames = (Vec<String>, Vec<String>, Vec<String>);
 type BlockOutputs = HashMap<String, BlockOutput>;
-
-/// A struct containing a TcpStream to send data to. The collection defines what data the
-/// subscriber receives.
-struct Subscriber(TcpStream, Collection);
-
-impl Subscriber {
-    /// Convenience function to get the Subscriber's TcpStream.
-    fn stream(&self) -> &TcpStream {
-        &self.0
-    }
-
-    /// Convenience function to get the Subscriber's requested Collection.
-    fn collection(&self) -> &Collection {
-        &self.1
-    }
-}
-
-/// A struct/tuple for a block update request sender.
-struct UpdateRequestSender(String, Sender<()>);
-
-impl UpdateRequestSender {
-    /// Convenience function for sending update requests.
-    fn send(&mut self) -> Result<(), mpsc::SendError<()>> {
-        self.1.send(())
-    }
-}
 
 /// A daemon for muse-status. The daemon handles the logic of blocks as a server. Any connected
 /// clients are sent the formatted status output.
@@ -53,10 +25,7 @@ pub struct Daemon {
 
     update_request_senders: Vec<UpdateRequestSender>,
 
-    block_names: BlockNames,
     block_outputs: BlockOutputs,
-
-    banners: VecDeque<Banner>,
 }
 
 type DaemonMutexArc = Arc<Mutex<Daemon>>;
@@ -70,27 +39,16 @@ impl Daemon {
 
             update_request_senders: Vec::new(),
 
-            block_names: Default::default(),
             block_outputs: Default::default(),
-
-            banners: VecDeque::new(),
         }
     }
 
     /// Starts the Daemon with the given blocks by running many asynchronous threads. If starting
     /// is successful, this function will return a Vec of JoinHandles, which are to be used by
     /// the calling function.
-    pub fn start(
-        mut self,
-        primary_blocks: BlockVec,
-        secondary_blocks: BlockVec,
-        tertiary_blocks: BlockVec,
-    ) -> Result<Vec<JoinHandle<()>>, MuseStatusError> {
+    pub fn start(mut self, blocks: BlockVec) -> Result<Vec<JoinHandle<()>>, MuseStatusError> {
         // start listening on the daemon's address
         let listener = TcpListener::bind(&self.addr)?;
-
-        // set block names from blocks
-        self.set_block_names_from_blocks(&primary_blocks, &secondary_blocks, &tertiary_blocks);
 
         // get channels for block outputs and banners
         let (block_tx, block_rx) = mpsc::channel::<BlockOutput>();
@@ -101,8 +59,7 @@ impl Daemon {
 
         // start status blocks
         println!("starting all blocks...");
-        let (mut block_handles, update_request_senders) =
-            self.start_all_blocks(block_tx, primary_blocks, secondary_blocks, tertiary_blocks);
+        let (mut block_handles, update_request_senders) = self.start_all_blocks(block_tx, blocks);
         self.update_request_senders = update_request_senders;
         thread_handles.append(&mut block_handles);
 
@@ -144,38 +101,15 @@ impl Daemon {
         Ok(thread_handles)
     }
 
-    fn set_block_names_from_blocks(
-        &mut self,
-        primary_blocks: BlockSlice,
-        secondary_blocks: BlockSlice,
-        tertiary_blocks: BlockSlice,
-    ) {
-        for p in primary_blocks {
-            self.block_names.0.push(p.name().to_string());
-        }
-        for s in secondary_blocks {
-            self.block_names.1.push(s.name().to_string());
-        }
-        for t in tertiary_blocks {
-            self.block_names.2.push(t.name().to_string());
-        }
-    }
-
     fn start_all_blocks(
         &self,
         sender: Sender<BlockOutput>,
-        primary_blocks: BlockVec,
-        mut secondary_blocks: BlockVec,
-        mut tertiary_blocks: BlockVec,
+        mut blocks: BlockVec,
     ) -> (Vec<JoinHandle<()>>, Vec<UpdateRequestSender>) {
         let mut handles = Vec::new();
         let mut senders = Vec::new();
 
-        let mut all = primary_blocks;
-        all.append(&mut secondary_blocks);
-        all.append(&mut tertiary_blocks);
-
-        while let Some(b) = all.pop() {
+        while let Some(b) = blocks.pop() {
             let name = b.name().to_string();
             println!("==> starting '{}'...", name);
 
@@ -268,7 +202,7 @@ impl Daemon {
             }
             ClientMsg::Update(collection) => {
                 println!("handling update request from client: {:?}", collection);
-                daemon.update_collection(collection);
+                daemon.update_collection(&collection);
             }
             ClientMsg::Noop => (), // literally do nothing
         }
@@ -292,7 +226,8 @@ impl Daemon {
         sub: &mut Subscriber,
         serialized_data: &str,
     ) -> Result<(), MuseStatusError> {
-        sub.stream().write_all(serialized_data.as_bytes())
+        sub.stream()
+            .write_all(serialized_data.as_bytes())
             .map_err(MuseStatusError::from)
     }
 
@@ -301,42 +236,12 @@ impl Daemon {
         unimplemented!()
     }
 
-    fn request_block_update(&mut self, who: &str) {
-        self.update_request_senders
-            .iter()
-            .find(|tup| tup.0 == who)
-            .map(|tup| tup.1.send(()));
-    }
-
-    fn is_block_name_in_collection(&self, block_name: &str, collection: &Collection) -> bool {
-        match collection {
-            Collection::All => true,
-            Collection::Primary => self.block_names.0.iter().any(|n| n == block_name),
-            Collection::Secondary => self.block_names.1.iter().any(|n| n == block_name),
-            Collection::Tertiary => self.block_names.2.iter().any(|n| n == block_name),
-            Collection::One(b) => b == block_name
-        }
-    }
-
-    fn update_collection(&mut self, collection: Collection) {
-        let (primary_names, secondary_names, tertiary_names) = &self.block_names;
-
+    fn update_collection(&mut self, collection: &Collection) {
         // get the iterator of requesters to use according to the collection
-        let mut all_iter_mut = self.update_request_senders.iter_mut();
-        let requesters: Vec<&mut UpdateRequestSender> = match collection {
-            Collection::All => all_iter_mut.collect(),
-            Collection::Primary => all_iter_mut
-                .filter(|s| primary_names.iter().any(|n| s.0 == *n))
-                .collect(),
-            Collection::Secondary => all_iter_mut
-                .filter(|s| secondary_names.iter().any(|n| s.0 == *n))
-                .collect(),
-            Collection::Tertiary => all_iter_mut
-                .filter(|s| tertiary_names.iter().any(|n| s.0 == *n))
-                .collect(),
-            Collection::One(b) => all_iter_mut
-                .find(|r| r.0 == b)
-                .map_or(vec![], |r| vec![r])};
+        let all_requesters = self.update_request_senders.iter_mut();
+        let requesters: Vec<&mut UpdateRequestSender> = all_requesters
+            .filter(|r| is_block_name_in_collection(&r.0, collection))
+            .collect();
 
         for requester in requesters {
             if let Err(e) = requester.send() {
@@ -346,104 +251,38 @@ impl Daemon {
     }
 }
 
-/// A payload sent from clients to the daemon.
-#[derive(Serialize, Deserialize, Debug)]
-pub enum ClientMsg {
-    /// Connect to the daemon and receive updates from it.
-    Subscribe(Collection),
+/// A struct containing a TcpStream to send data to. The collection defines what data the
+/// subscriber receives.
+struct Subscriber(TcpStream, Collection);
 
-    /// Update some part of the client.
-    Update(Collection),
+impl Subscriber {
+    /// Convenience function to get the Subscriber's TcpStream.
+    fn stream(&self) -> &TcpStream {
+        &self.0
+    }
 
-    /// Literally do nothing.
-    Noop,
-}
-
-impl ClientMsg {
-    /// Creates a ClientMsg from arguments passed through the command line.
-    pub fn from_env() -> Self {
-        // a temporary type to pick up the pieces passed through the command line. (it would be
-        // difficult to get the message type and the collection argument at the same time)
-        enum ClientMsgType {
-            Subscribe,
-            Update,
-        }
-
-        let env = std::env::args();
-
-        let mut force_update = false;
-        let mut collection = None;
-        let mut msg_type = None;
-
-        for arg in env {
-            if arg == "--force" || arg == "-f" {
-                force_update = true;
-            } else if arg.starts_with('-') || arg.is_empty() {
-                continue;
-            }
-
-            // check if arg starts with any of the following:
-            //      "su" => subscribe
-            //      "l"  => listen
-            //      "u"  => update
-            //      "n"  => notify
-            //      "p"  => primary
-            //      "se" => secondary
-            //      "t"  => tertiary
-            //      "a"  => all
-            if arg.starts_with("su") || arg.starts_with('l') {
-                msg_type = Some(ClientMsgType::Subscribe);
-            } else if arg.starts_with('u') || arg.starts_with('n') {
-                msg_type = Some(ClientMsgType::Update);
-            } else if arg.starts_with('p') {
-                collection = Some(Collection::Primary);
-            } else if arg.starts_with("se") {
-                collection = Some(Collection::Secondary);
-            } else if arg.starts_with('t') {
-                collection = Some(Collection::Tertiary);
-            } else if arg.starts_with('a') {
-                collection = Some(Collection::All);
-            } else {
-                assert!(!arg.starts_with('-'));
-                collection = Some(Collection::One(arg));
-            }
-        }
-
-        // assemble the msg
-        if let Some(t) = msg_type {
-            match collection {
-                Some(c) => match t {
-                    ClientMsgType::Subscribe => Self::Subscribe(c),
-                    ClientMsgType::Update => Self::Update(c),
-                },
-                None => {
-                    match t {
-                        ClientMsgType::Subscribe => Self::Subscribe(Collection::All),
-                        ClientMsgType::Update => {
-                            if force_update {
-                                Self::Update(Collection::All)
-                            } else {
-                                println!("what do you want to update? try `update all` or `update primary`");
-                                Self::Noop
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            Self::default()
-        }
+    /// Convenience function to get the Subscriber's requested Collection.
+    fn collection(&self) -> &Collection {
+        &self.1
     }
 }
 
-impl Default for ClientMsg {
-    fn default() -> Self {
-        Self::Subscribe(Collection::All)
+/// A struct/tuple for a block update request sender.
+struct UpdateRequestSender(String, Sender<()>);
+
+impl UpdateRequestSender {
+    /// Convenience function for sending update requests.
+    fn send(&mut self) -> Result<(), mpsc::SendError<()>> {
+        self.1.send(())
     }
 }
+
+const PRIMARY_ORDER: &[&str] = &["date", "weather", "mpris"];
+const SECONDARY_ORDER: &[&str] = &["battery", "network", "volume", "brightness"];
+const TERTIARY_ORDER: &[&str] = &[""];
 
 /// An enum for specifying a section of blocks. Used for subscriptions and other commands.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Collection {
     /// Primary-level blocks.
     Primary,
@@ -459,6 +298,9 @@ pub enum Collection {
 
     /// One specific block.
     One(String),
+
+    /// Many custom-picked blocks.
+    Many(Vec<String>),
 }
 
 /// A payload sent to clients, containing data.
@@ -468,48 +310,104 @@ pub enum DaemonMsg {
     NewOutput(BlockOutput),
 }
 
-/// A collection of all outputs from blocks. Sent to clients as part of a DaemonMsg.
+/// A collection of outputs from blocks to be formatted
 #[derive(Serialize, Deserialize, Debug)]
-pub struct DataOutput {
-    /// Output from primary blocks.
-    pub primary: Vec<BlockOutput>,
+pub enum DataPayload {
+    /// All blocks ranked by primary, secondary, and tertiary levels
+    Ranked {
+        /// Primary-ranked blocks.
+        primary: Vec<BlockOutput>,
 
-    /// Output from secondary blocks.
-    pub secondary: Vec<BlockOutput>,
+        /// Secondary-ranked blocks.
+        secondary: Vec<BlockOutput>,
 
-    /// Output from tertiary blocks.
-    pub tertiary: Vec<BlockOutput>,
+        /// Tertiary-ranked blocks.
+        tertiary: Vec<BlockOutput>,
+    },
+
+    /// A custom ordering of blocks.
+    Unranked(Vec<BlockOutput>),
 }
 
-impl DataOutput {
-    fn from_block_names_and_outputs(
-        block_names: &BlockNames,
-        outputs: &HashMap<String, BlockOutput>,
-    ) -> Self {
-        let (mut primary, mut secondary, mut tertiary) = (Vec::new(), Vec::new(), Vec::new());
+impl DataPayload {
+    /// Creates a Ranked DataPayload out of the outputs provided.
+    pub fn ranked(outputs: &HashMap<String, BlockOutput>) -> Self {
+        let (primary, secondary, tertiary) = (
+            Self::make_vec(PRIMARY_ORDER, outputs),
+            Self::make_vec(SECONDARY_ORDER, outputs),
+            Self::make_vec(TERTIARY_ORDER, outputs),
+        );
 
-        for p in &block_names.0 {
-            if let Some(o) = outputs.get(p) {
-                primary.push((*o).clone());
-            }
-        }
-
-        for s in &block_names.1 {
-            if let Some(o) = outputs.get(s) {
-                secondary.push((*o).clone());
-            }
-        }
-
-        for t in &block_names.2 {
-            if let Some(o) = outputs.get(t) {
-                tertiary.push((*o).clone());
-            }
-        }
-
-        Self {
+        Self::Ranked {
             primary,
             secondary,
             tertiary,
         }
+    }
+
+    /// Creates a Ranked DataPayload out of the outputs provided, but only with primary blocks.
+    pub fn only_primary(outputs: &HashMap<String, BlockOutput>) -> Self {
+        let v = Self::make_vec(PRIMARY_ORDER, outputs);
+
+        Self::Ranked {
+            primary: v,
+            secondary: Default::default(),
+            tertiary: Default::default(),
+        }
+    }
+
+    /// Creates a Ranked DataPayload out of the outputs provided, but only with secondary blocks.
+    pub fn only_secondary(outputs: &HashMap<String, BlockOutput>) -> Self {
+        let v = Self::make_vec(SECONDARY_ORDER, outputs);
+
+        Self::Ranked {
+            primary: Default::default(),
+            secondary: v,
+            tertiary: Default::default(),
+        }
+    }
+
+    /// Creates a Ranked DataPayload out of the outputs provided, but only with tertiary blocks.
+    pub fn only_tertiary(outputs: &HashMap<String, BlockOutput>) -> Self {
+        let v = Self::make_vec(TERTIARY_ORDER, outputs);
+
+        Self::Ranked {
+            primary: Default::default(),
+            secondary: Default::default(),
+            tertiary: v,
+        }
+    }
+
+    /// Creates an Unranked DataPayload out any arbitrary combination of blocks.
+    pub fn from_many(names: &[&str], outputs: &HashMap<String, BlockOutput>) -> Self {
+        let v = Self::make_vec(names, outputs);
+        Self::Unranked(v)
+    }
+
+    /// Creates an Unranked DataPayload out of exactly one arbitrary block.
+    pub fn from_one(name: &str, outputs: &HashMap<String, BlockOutput>) -> Self {
+        Self::Unranked(Self::make_vec(&[name], outputs))
+    }
+
+    fn make_vec(names: &[&str], outputs: &HashMap<String, BlockOutput>) -> Vec<BlockOutput> {
+        let mut v = Vec::new();
+        for name in names {
+            if let Some(o) = outputs.get(*name) {
+                v.push(o.clone());
+            }
+        }
+
+        v
+    }
+}
+
+fn is_block_name_in_collection(block_name: &str, collection: &Collection) -> bool {
+    match collection {
+        Collection::All => true,
+        Collection::Primary => PRIMARY_ORDER.iter().any(|&n| n == block_name),
+        Collection::Secondary => SECONDARY_ORDER.iter().any(|&n| n == block_name),
+        Collection::Tertiary => TERTIARY_ORDER.iter().any(|&n| n == block_name),
+        Collection::One(b) => b == block_name,
+        Collection::Many(v) => v.iter().any(|n| n == block_name),
     }
 }
