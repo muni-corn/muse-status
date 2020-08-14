@@ -28,21 +28,18 @@ fn main() {
     let volume_block = volume::VolumeBlock::new();
     let weather_block = weather::WeatherBlock::new();
 
-    let primary_blocks: Vec<Box<dyn Block>> = vec![
+    let blocks: Vec<Box<dyn Block>> = vec![
         Box::new(date_block),
         Box::new(weather_block),
         Box::new(mpris_block),
-    ];
-    let secondary_blocks: Vec<Box<dyn Block>> = vec![
         Box::new(brightness_block),
         Box::new(volume_block),
         Box::new(network_block),
         Box::new(battery_block),
     ];
-    let tertiary_blocks: Vec<Box<dyn Block>> = Vec::new();
 
     let daemon = Daemon::new("localhost:1612");
-    match daemon.start(primary_blocks, secondary_blocks, tertiary_blocks) {
+    match daemon.start(blocks) {
         Ok(j) => {
             println!("the daemon is running");
             for handle in j {
