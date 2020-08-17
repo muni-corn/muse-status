@@ -72,6 +72,7 @@ impl Client {
             // listen for outputs from the daemon and print them
             'inner: loop {
                 let mut s = String::new();
+                #[allow(clippy::single_match)]
                 match buf_stream.read_line(&mut s) {
                     Ok(n) => {
                         if n == 0 {
@@ -81,7 +82,7 @@ impl Client {
                             let msg = match serde_json::from_str::<DaemonMsg>(&s) {
                                 Ok(m) => m,
                                 Err(e) => {
-                                    self.echo_error(e, &formatter);
+                                    eprintln!("{}", e);
                                     break 'inner;
                                 }
                             };
@@ -92,10 +93,16 @@ impl Client {
                                     self.data.insert(o.block_name.clone(), o);
                                     self.echo_output(collection, &formatter);
                                 }
+                                DaemonMsg::AllData(a) => {
+                                    for output in a {
+                                        self.data.insert(output.block_name.clone(), output);
+                                    }
+                                    self.echo_output(collection, &formatter);
+                                }
                             }
                         }
                     }
-                    Err(e) => self.echo_error(e, &formatter),
+                    Err(e) => eprintln!("{}", e),
                 }
             }
 
@@ -105,7 +112,7 @@ impl Client {
     }
 
     /// Prints formatted output.
-    fn echo_output(&self, collection: &Collection, f: &Formatter) -> Result<(), MuseStatusError> {
+    fn echo_output(&self, collection: &Collection, f: &Formatter) {
         let data = match collection {
             Collection::All => DataPayload::ranked(&self.data),
             Collection::Primary => DataPayload::only_primary(&self.data),
@@ -119,13 +126,13 @@ impl Client {
         };
 
         println!("{}", f.format_data(data));
-        Ok(())
     }
 
-    /// Prints formatted error.
-    fn echo_error<E: Error>(&self, e: E, f: &Formatter) {
-        println!("{}", f.format_error(e));
-    }
+    // TODO
+    // /// Prints formatted error.
+    // fn echo_error<E: Error>(&self, e: E, f: &Formatter) {
+    //     println!("{}", f.format_error(e));
+    // }
 }
 
 /// Polls for a connection to the daemon.
