@@ -3,7 +3,7 @@ pub mod output;
 
 use crate::errors::UpdateError;
 use crate::format;
-use output::{BlockOutput, BlockOutputContent};
+pub use output::{BlockOutput, BlockOutputContent};
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -20,10 +20,7 @@ pub trait Block: Send + Sync {
     /// block name specified (or whatever string is sent through). The Block, which should be
     /// listening with a partnered Receiver in a different thread, can handle this data as it
     /// pleases.
-    fn run(
-        self: Box<Self>,
-        block_sender: Sender<BlockOutput>,
-    ) -> (Vec<JoinHandle<()>>, Sender<()>)
+    fn run(self: Box<Self>, block_sender: Sender<BlockOutput>) -> (Vec<JoinHandle<()>>, Sender<()>)
     where
         Self: 'static,
     {
