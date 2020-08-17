@@ -47,6 +47,9 @@ impl Daemon {
     /// is successful, this function will return a Vec of JoinHandles, which are to be used by
     /// the calling function.
     pub fn start(mut self, blocks: BlockVec) -> Result<Vec<JoinHandle<()>>, MuseStatusError> {
+        #[cfg(debug_assertions)]
+        println!("the daemon has been started");
+
         // start listening on the daemon's address
         let listener = TcpListener::bind(&self.addr)?;
 
@@ -111,6 +114,8 @@ impl Daemon {
 
         while let Some(b) = blocks.pop() {
             let name = b.name().to_string();
+
+            #[cfg(debug_assertions)]
             println!("==> starting '{}'...", name);
 
             let (mut handle_vec, sender) = b.run(sender.clone());
@@ -125,6 +130,9 @@ impl Daemon {
     /// Should be run within a separate thread. `self` should NOT be a parameter, as a mutex would
     /// be locked for the entirety of this never-ending function.
     fn accept_connections(daemon_arc: DaemonMutexArc, listener: &TcpListener) {
+        #[cfg(debug_assertions)]
+        println!("listening for connections");
+
         for result in listener.incoming() {
             match result {
                 Ok(conn) => {
@@ -143,7 +151,13 @@ impl Daemon {
     /// Should be run within a separate thread. `self` should NOT be a parameter, as a mutex would
     /// be locked for the entirety of this never-ending function.
     fn listen_to_blocks(daemon_arc: DaemonMutexArc, block_rx: Receiver<BlockOutput>) {
+        #[cfg(debug_assertions)]
+        println!("listening for block updates");
+
         while let Ok(output) = block_rx.recv() {
+            #[cfg(debug_assertions)]
+            println!("received block update from {}: {:?}", output.block_name, output.body);
+
             let mut daemon = daemon_arc.lock().unwrap();
             daemon
                 .block_outputs
@@ -168,15 +182,18 @@ impl Daemon {
         conn: TcpStream,
         collection: Collection,
     ) -> Result<(), MuseStatusError> {
+        #[cfg(debug_assertions)]
+        println!("a new subscriber requested to connect");
+
         // initialize the subscriber by sending all current data to it
         let mut sub = Subscriber(conn, collection);
-        self.force_send_data(&mut sub);
+        self.force_send_data(&mut sub)?;
 
         // register the subscriber
         self.subscribers.push(sub);
 
-        // notify we've successfully connected with a new subscriber
-        println!("new subscriber connected");
+        #[cfg(debug_assertions)]
+        println!("new subscriber successfully connected");
 
         Ok(())
     }
@@ -190,17 +207,21 @@ impl Daemon {
         let mut buf_reader = std::io::BufReader::new(conn.try_clone()?);
         let mut raw_action = String::new();
 
-        // TODO XXX This is probably our issue! This call will block if the client doesn't send
-        // anything. Move this and all following into a separate thread (maybe)?
         buf_reader.read_line(&mut raw_action)?;
 
         let action = serde_json::from_str(raw_action.as_str())?;
+
+        #[cfg(debug_assertions)]
+        println!("handling message from new client: {:?}", action);
+
         match action {
             ClientMsg::Subscribe(collection) => {
                 daemon.subscribe_client(conn, collection)?;
             }
             ClientMsg::Update(collection) => {
+                #[cfg(debug_assertions)]
                 println!("handling update request from client: {:?}", collection);
+
                 daemon.update_collection(&collection);
             }
             ClientMsg::Noop => (), // literally do nothing
@@ -211,11 +232,19 @@ impl Daemon {
 
     /// Sends data updates to subscribers.
     fn send_output_update_to_all(&mut self, new_block_output: BlockOutput) -> Result<(), MuseStatusError> {
-        let iter = self.subscribers.iter_mut();
-        let serialized_output = serde_json::to_string(&new_block_output)?;
+        #[cfg(debug_assertions)]
+        println!("sending output to all subscribers: {:?}", new_block_output);
 
-        for sub in iter {
-            send_serialized_data(sub, &serialized_output)?;
+        let block_name = new_block_output.block_name.clone();
+        let serialized_output = serde_json::to_string(&DaemonMsg::NewOutput(new_block_output))?;
+
+        for sub in self.subscribers.iter_mut() {
+            if is_block_name_in_collection(&block_name, sub.collection()) {
+                send_serialized_data(sub, &serialized_output)?;
+            } else {
+                #[cfg(debug_assertions)]
+                println!("subscriber skipped when sending update: collection is {:?}", sub.collection());
+            }
         }
 
         Ok(())
@@ -300,6 +329,8 @@ pub enum Collection {
 pub enum DaemonMsg {
     /// New output to be sent to clients
     NewOutput(BlockOutput),
+
+    /// A Vec of BlockOutputs for all data currently known by the daemon.
     AllData(Vec<BlockOutput>),
 }
 
@@ -409,7 +440,9 @@ fn send_serialized_data(
     sub: &mut Subscriber,
     serialized_data: &str,
 ) -> Result<(), MuseStatusError> {
+    // add a new line to the end of the data so that clients can parse correctly
+    let out = format!("{}\n", serialized_data);
     sub.stream()
-        .write_all(serialized_data.as_bytes())
+        .write_all(out.as_bytes())
         .map_err(MuseStatusError::from)
 }
