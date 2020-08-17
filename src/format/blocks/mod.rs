@@ -3,7 +3,7 @@ pub mod output;
 
 use crate::errors::UpdateError;
 use crate::format;
-use output::{BlockOutput, BlockOutputContent};
+pub use output::{BlockOutput, BlockOutputContent};
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -20,14 +20,11 @@ pub trait Block: Send + Sync {
     /// block name specified (or whatever string is sent through). The Block, which should be
     /// listening with a partnered Receiver in a different thread, can handle this data as it
     /// pleases.
-    fn run(
-        self: Box<Self>,
-        block_sender: Sender<BlockOutput>,
-    ) -> (Vec<JoinHandle<()>>, Sender<String>)
+    fn run(self: Box<Self>, block_sender: Sender<BlockOutput>) -> (Vec<JoinHandle<()>>, Sender<()>)
     where
         Self: 'static,
     {
-        let (notify_tx, notify_rx) = mpsc::channel::<String>();
+        let (notify_tx, notify_rx) = mpsc::channel::<()>();
 
         // make arcs and mutexes
         let loop_thread_name = format!("{} update loop", self.name());
@@ -36,7 +33,7 @@ pub trait Block: Send + Sync {
         let arc_clone = block_arc_mutex.clone();
 
         // clone the sender
-        let sender_clone = block_sender.clone();
+        let output_sender_clone = block_sender.clone();
 
         let loop_handle = thread::Builder::new()
             .name(loop_thread_name)
@@ -66,14 +63,12 @@ pub trait Block: Send + Sync {
         let notify_listen_handle = thread::Builder::new()
             .name(notify_listener_thread_name)
             .spawn(move || {
-                while let Ok(name) = notify_rx.recv() {
+                while notify_rx.recv().is_ok() {
                     let mut block = arc_clone.lock().unwrap();
-                    if name == block.name() {
-                        let _ = block.update();
-                        sender_clone
-                            .send(BlockOutput::new(block.name(), block.output()))
-                            .unwrap();
-                    }
+                    let _ = block.update();
+                    output_sender_clone
+                        .send(BlockOutput::new(block.name(), block.output()))
+                        .unwrap();
                 }
             })
             .unwrap();

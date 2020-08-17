@@ -9,16 +9,16 @@ pub mod color;
 
 // TODO create a separate module for Banner
 
-use crate::daemon::DataOutput;
+use crate::daemon::DataPayload;
 use crate::format::blocks::output::{BlockOutput, BlockOutputContent};
+use crate::errors::{MuseStatusError, BasicError};
 use crate::utils;
 use color::{Color, RGBA};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::str::FromStr;
-use std::sync::mpsc;
 
+/// Four spaces.
 const MARKUP_SEPARATOR: &str = "    ";
 
 /// Attention provides a way to easily apply colors to a Block, without actually passing any RGBA
@@ -68,14 +68,8 @@ pub struct Formatter {
     text_font: String,
     icon_font: String,
 
-    /// Stores outputs of blocks.
-    outputs: HashMap<String, blocks::output::BlockOutputContent>,
-
     /// A banner queue.
     banners: VecDeque<Banner>,
-
-    /// Sends outputs, if Some.
-    output_sender: Option<mpsc::Sender<String>>,
 }
 
 /// The output of a Banner.
@@ -90,8 +84,13 @@ pub enum BannerOutput {
 /// A banner temporarily hides all blocks on the status bar to bring information front and center
 /// for a set duration of time.
 pub struct Banner {
+    /// A unique identifier, used to update a banner if a twin (with the same id) is sent.
     id: String,
+
+    /// Banner content.
     content: BannerOutput,
+
+    /// How long the banner should remain visible.
     seconds: f32,
 }
 
@@ -123,14 +122,10 @@ impl Default for Formatter {
                 b: 0x00,
                 a: 0xff,
             },
-            text_font: String::from("Roboto 10"),
+            text_font: String::from("sans 10"),
             icon_font: String::from("Material Design Icons 12"),
 
-            outputs: HashMap::new(),
-
             banners: VecDeque::new(),
-
-            output_sender: None,
         }
     }
 }
@@ -141,52 +136,99 @@ impl Formatter {
         Default::default()
     }
 
+    /// Creates and returns a new Formatter from command line arguments.
+    pub fn from_env() -> Result<Self, MuseStatusError> {
+        let mut args = std::env::args().skip(1);
+
+        let mut formatter: Self = Default::default();
+
+        while let Some(arg) = args.next() {
+            if let Some(value) = args.next() {
+                match arg.as_str() {
+                    "-p" | "--primary-color" => formatter.set_primary_color(&value)?,
+                    "-s" | "--secondary-color" => formatter.set_secondary_color(&value)?,
+                    "-f" | "--font" => formatter.set_text_font(&value),
+                    "-i" | "--icon-font" => formatter.set_icon_font(&value),
+                    "-m" | "--mode" => formatter.set_mode_from_str(&value)?,
+                    _ => (),
+                }
+            } else {
+                return Err(MuseStatusError::from(BasicError {
+                    message: format!("flag requires a value: {}", arg),
+                }));
+            }
+        }
+
+        Ok(formatter)
+    }
+
     /// Chains status bites together, ensuring that there are no awkward spaces between bites, and
     /// outputs a result fit to be parsed by a status bar. The string can safely be printed as-is
-    /// without additional formatting.
-    pub fn format_data(&self, data: DataOutput) -> String {
+    /// without additional formatting or newlines.
+    pub fn format_data(&self, data: DataPayload) -> String {
         match self.formatting_mode {
             Mode::JsonProtocol => {
-                let mut string_outputs: Vec<String> = Vec::new();
-                for block_output in data
-                    .tertiary
-                    .iter()
-                    .chain(data.secondary.iter().chain(data.primary.iter().rev()))
-                {
-                    if let Some(jps) = self.block_output_as_json_protocol_string(block_output) {
-                        string_outputs.push(jps)
+                let mut json_strings = Vec::new();
+                match data {
+                    DataPayload::Ranked { primary, secondary, tertiary } => {
+                        for block_output in tertiary
+                            .iter()
+                            .chain(secondary.iter().chain(primary.iter().rev()))
+                            {
+                                if let Some(jps) = self.block_output_as_json_protocol_string(block_output) {
+                                    json_strings.push(jps)
+                                }
+                            }
                     }
+                    DataPayload::Unranked(outputs) => {
+                        for block_output in outputs {
+                            if let Some(jps) = self.block_output_as_json_protocol_string(&block_output) {
+                                json_strings.push(jps)
+                            }
+                        }
+                    },
                 }
-                let joined = string_outputs.join(",");
+                let joined = json_strings.join(",");
                 format!(",[{}]", joined)
             }
             Mode::Lemonbar => unimplemented!(),
             Mode::Markup => {
-                let mut string_outputs = Vec::new();
-
-                for block_output in data
-                    .tertiary
-                    .iter()
-                    .chain(data.secondary.iter().chain(data.primary.iter().rev()))
-                {
-                    if let Some(m) = self.block_output_as_markup(block_output) {
-                        string_outputs.push(m)
+                let mut markup_strings = Vec::new();
+                match data {
+                    DataPayload::Ranked { primary, secondary, tertiary } => {
+                        for block_output in tertiary
+                            .iter()
+                            .chain(secondary.iter().chain(primary.iter().rev()))
+                            {
+                                if let Some(jps) = self.block_output_as_markup(block_output) {
+                                    markup_strings.push(jps)
+                                }
+                            }
                     }
+                    DataPayload::Unranked(outputs) => {
+                        for block_output in outputs {
+                            if let Some(jps) = self.block_output_as_markup(&block_output) {
+                                markup_strings.push(jps)
+                            }
+                        }
+                    },
                 }
 
-                string_outputs.join(MARKUP_SEPARATOR)
+                markup_strings.join(MARKUP_SEPARATOR)
             }
         }
     }
 
-    /// Formats an error in a format that can be parsed and displayed by a status bar.
-    pub fn format_error<E: std::error::Error>(&self, _: E) -> String {
-        match self.formatting_mode {
-            Mode::JsonProtocol => unimplemented!(),
-            Mode::Lemonbar => unimplemented!(),
-            Mode::Markup => unimplemented!(),
-        }
-    }
+    // TODO
+    // /// Formats an error in a format that can be parsed and displayed by a status bar. No
+    // /// additional formatting is required.
+    // pub fn format_error<E: std::error::Error>(&self, _: E) -> String {
+    //     match self.formatting_mode {
+    //         Mode::JsonProtocol => unimplemented!(),
+    //         Mode::Lemonbar => unimplemented!(),
+    //         Mode::Markup => unimplemented!(),
+    //     }
+    // }
 
     /// Sets the formatting mode.
     pub fn set_format_mode(&mut self, m: Mode) {
@@ -263,6 +305,26 @@ impl Formatter {
             Color::Secondary => self.secondary_color.clone(),
             Color::Other(rgba) => rgba.clone(),
         }
+    }
+
+    /// Sets the Formatter's mode from the string `s`. j
+    pub fn set_mode_from_str(&mut self, s: &str) -> Result<(), MuseStatusError> {
+        match s {
+            "i3" => {
+                self.set_format_mode(Mode::JsonProtocol);
+            }
+            "lemon" => {
+                self.set_format_mode(Mode::Lemonbar);
+            }
+            "plain" | "markup" => {
+                self.set_format_mode(Mode::Markup);
+            }
+            _ => return Err(MuseStatusError::from(BasicError {
+                message: format!("this format isn't recognized: `{}`", s),
+            }))
+        }
+
+        Ok(())
     }
 
     /// Formats the BlockOutput for the i3 JSON protocol. None if body is None.

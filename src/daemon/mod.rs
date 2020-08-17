@@ -1,10 +1,10 @@
+use crate::client::ClientMsg;
 use crate::errors::*;
 use crate::format;
 use crate::format::blocks::output::BlockOutput;
 use crate::format::blocks::Block;
-use crate::format::Banner;
 use serde::{Deserialize, Serialize};
-use std::collections::{VecDeque, HashMap};
+use std::collections::HashMap;
 use std::io::BufRead;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
@@ -15,57 +15,43 @@ use std::thread;
 use std::thread::JoinHandle;
 
 type BlockVec = Vec<Box<dyn Block>>;
-type BlockSlice<'a> = &'a [Box<dyn Block>];
-type BlockNames = (Vec<String>, Vec<String>, Vec<String>);
 type BlockOutputs = HashMap<String, BlockOutput>;
 
 /// A daemon for muse-status. The daemon handles the logic of blocks as a server. Any connected
 /// clients are sent the formatted status output.
 pub struct Daemon {
     addr: String,
-    connections: Vec<TcpStream>,
+    subscribers: Vec<Subscriber>,
 
-    notify_senders: Vec<Sender<String>>,
+    update_request_senders: Vec<UpdateRequestSender>,
 
-    block_names: BlockNames,
     block_outputs: BlockOutputs,
-
-    banners: VecDeque<Banner>,
 }
 
 type DaemonMutexArc = Arc<Mutex<Daemon>>;
 
 impl Daemon {
     /// Creates a new Daemon that runs at the specified address.
-    pub fn new(
-        addr: &str,
-    ) -> Self {
+    pub fn new(addr: &str) -> Self {
         Daemon {
             addr: addr.to_string(),
-            connections: Vec::new(),
+            subscribers: Vec::new(),
 
-            notify_senders: Vec::new(),
+            update_request_senders: Vec::new(),
 
-            block_names: Default::default(),
             block_outputs: Default::default(),
-
-            banners: VecDeque::new(),
         }
     }
 
     /// Starts the Daemon with the given blocks by running many asynchronous threads. If starting
     /// is successful, this function will return a Vec of JoinHandles, which are to be used by
     /// the calling function.
-    pub fn start(mut self,
-        primary_blocks: BlockVec,
-        secondary_blocks: BlockVec,
-        tertiary_blocks: BlockVec,
-    ) -> Result<Vec<JoinHandle<()>>, MuseStatusError> {
+    pub fn start(mut self, blocks: BlockVec) -> Result<Vec<JoinHandle<()>>, MuseStatusError> {
+        #[cfg(debug_assertions)]
+        println!("the daemon has been started");
+
         // start listening on the daemon's address
         let listener = TcpListener::bind(&self.addr)?;
-
-        // set block names from blocks
-        self.set_block_names_from_blocks(&primary_blocks, &secondary_blocks, &tertiary_blocks);
 
         // get channels for block outputs and banners
         let (block_tx, block_rx) = mpsc::channel::<BlockOutput>();
@@ -76,8 +62,8 @@ impl Daemon {
 
         // start status blocks
         println!("starting all blocks...");
-        let (mut block_handles, update_request_senders) = self.start_all_blocks(block_tx, primary_blocks, secondary_blocks, tertiary_blocks);
-        self.notify_senders = update_request_senders;
+        let (mut block_handles, update_request_senders) = self.start_all_blocks(block_tx, blocks);
+        self.update_request_senders = update_request_senders;
         thread_handles.append(&mut block_handles);
 
         let daemon_arc_mutex = Arc::new(Mutex::new(self));
@@ -86,79 +72,67 @@ impl Daemon {
         let data_clone = daemon_arc_mutex.clone();
         thread_handles.push(
             thread::Builder::new()
-            .name(String::from("client listener"))
-            .spawn(move || {
-                Self::accept_connections(data_clone, &listener);
-            })
-            .unwrap(),
+                .name(String::from("client listener"))
+                .spawn(move || {
+                    Self::accept_connections(data_clone, &listener);
+                })
+                .unwrap(),
         );
 
         // listen for block outputs
         let blocks_thread_daemon_mutex = daemon_arc_mutex.clone();
         thread_handles.push(
             thread::Builder::new()
-            .name(String::from("block listener"))
-            .spawn(move || {
-                Self::listen_to_blocks(blocks_thread_daemon_mutex, block_rx);
-            })
-            .unwrap(),
+                .name(String::from("block listener"))
+                .spawn(move || {
+                    Self::listen_to_blocks(blocks_thread_daemon_mutex, block_rx);
+                })
+                .unwrap(),
         );
 
         // listen for banners
         let banners_thread_daemon_mutex = daemon_arc_mutex;
         thread_handles.push(
             thread::Builder::new()
-            .name(String::from("banner listener"))
-            .spawn(move || {
-                Self::listen_for_banners(banners_thread_daemon_mutex, banner_rx);
-            })
-            .unwrap(),
+                .name(String::from("banner listener"))
+                .spawn(move || {
+                    Self::listen_for_banners(banners_thread_daemon_mutex, banner_rx);
+                })
+                .unwrap(),
         );
 
         Ok(thread_handles)
     }
 
-    fn set_block_names_from_blocks(&mut self, primary_blocks: &BlockVec, secondary_blocks: &BlockVec, tertiary_blocks: &BlockVec) {
-        for p in primary_blocks {
-            self.block_names.0.push(p.name().to_string());
-        }
-        for s in secondary_blocks {
-            self.block_names.1.push(s.name().to_string());
-        }
-        for t in tertiary_blocks {
-            self.block_names.2.push(t.name().to_string());
-        }
-    }
-
     fn start_all_blocks(
         &self,
         sender: Sender<BlockOutput>,
-        primary_blocks: BlockVec,
-        mut secondary_blocks: BlockVec,
-        mut tertiary_blocks: BlockVec,
-    ) -> (Vec<JoinHandle<()>>, Vec<Sender<String>>) {
-        let mut handles: Vec<JoinHandle<()>> = Vec::new();
-        let mut senders: Vec<Sender<String>> = Vec::new();
+        mut blocks: BlockVec,
+    ) -> (Vec<JoinHandle<()>>, Vec<UpdateRequestSender>) {
+        let mut handles = Vec::new();
+        let mut senders = Vec::new();
 
-        let mut all = primary_blocks;
-        all.append(&mut secondary_blocks);
-        all.append(&mut tertiary_blocks);
+        while let Some(b) = blocks.pop() {
+            let name = b.name().to_string();
 
-        while let Some(b) = all.pop() {
-            println!("==> starting '{}'...", b.name());
+            #[cfg(debug_assertions)]
+            println!("==> starting '{}'...", name);
 
             let (mut handle_vec, sender) = b.run(sender.clone());
 
             handles.append(&mut handle_vec);
-            senders.push(sender);
+            senders.push(UpdateRequestSender(name, sender));
         }
 
         (handles, senders)
     }
 
-    /// Shound be run within a separate thread. `self` should NOT a parameter, as a mutex would be
-    /// locked for the entirety of this never-ending function.
+    /// Should be run within a separate thread. `self` should NOT be a parameter, as a mutex would
+    /// be locked for the entirety of this never-ending function.
     fn accept_connections(daemon_arc: DaemonMutexArc, listener: &TcpListener) {
+        #[cfg(debug_assertions)]
+        println!("listening for connections");
+
         for result in listener.incoming() {
             match result {
                 Ok(conn) => {
@@ -174,161 +148,301 @@ impl Daemon {
         }
     }
 
-    /// Shound be run within a separate thread. `self` should NOT a parameter, as a mutex would be
-    /// locked for the entirety of this never-ending function.
+    /// Should be run within a separate thread. `self` should NOT be a parameter, as a mutex would
+    /// be locked for the entirety of this never-ending function.
     fn listen_to_blocks(daemon_arc: DaemonMutexArc, block_rx: Receiver<BlockOutput>) {
+        #[cfg(debug_assertions)]
+        println!("listening for block updates");
+
         while let Ok(output) = block_rx.recv() {
+            #[cfg(debug_assertions)]
+            println!("received block update from {}: {:?}", output.block_name, output.body);
+
             let mut daemon = daemon_arc.lock().unwrap();
-            daemon.block_outputs.insert(output.block_name.clone(), output.clone());
-            let _ = daemon.send_data_to_all(); // TODO
-        }
-    }
+            daemon
+                .block_outputs
+                .insert(output.block_name.clone(), output.clone());
 
-    /// Shound be run within a separate thread. `self` should NOT a parameter, as a mutex would be
-    /// locked for the entirety of this never-ending function.
-    fn listen_for_banners(daemon_arc: DaemonMutexArc, banner_rx: Receiver<format::Banner>) {
-        while let Ok(_) = banner_rx.recv() {
-            let _ = daemon_arc.lock().unwrap().send_data_to_all(); // TODO
-        }
-    }
-
-    fn handle_client_command(&mut self, cmd: &str) -> Result<(), MuseStatusError> {
-        // handle command
-        let mut split = cmd.split_whitespace();
-
-        if let Some(command) = split.next() {
-            match command {
-                "update" | "notify" => {
-                    for value in split {
-                        self.notify(&value);
-                    }
-                }
-                _ => {
-                    // unknown subcommand
-                    return Err(MuseStatusError::from(BasicError {
-                        message: format!(
-                                     "muse-status doesn't understand this command: {}",
-                                     command
-                                 ),
-                    }));
-                }
+            if let Err(e) = daemon.send_output_update_to_all(output) {
+                eprintln!("there was an error: {}", e)
             }
         }
+    }
+
+    /// Should be run within a separate thread. `self` should NOT be a parameter, as a mutex would
+    /// be locked for the entirety of this never-ending function.
+    fn listen_for_banners(_daemon_arc: DaemonMutexArc, _banner_rx: Receiver<format::Banner>) {
+        // while let Ok(_) = banner_rx.recv() {
+        //     let _ = daemon_arc.lock().unwrap().send_data_to_all();
+        // }
+    }
+
+    fn subscribe_client(
+        &mut self,
+        conn: TcpStream,
+        collection: Collection,
+    ) -> Result<(), MuseStatusError> {
+        #[cfg(debug_assertions)]
+        println!("a new subscriber requested to connect");
+
+        // initialize the subscriber by sending all current data to it
+        let mut sub = Subscriber(conn, collection);
+        self.force_send_data(&mut sub)?;
+
+        // register the subscriber
+        self.subscribers.push(sub);
+
+        #[cfg(debug_assertions)]
+        println!("new subscriber successfully connected");
 
         Ok(())
     }
 
     fn handle_connection(
         daemon_arc: DaemonMutexArc,
-        mut conn: TcpStream,
+        conn: TcpStream,
     ) -> Result<(), MuseStatusError> {
         let mut daemon = daemon_arc.lock().unwrap();
 
         let mut buf_reader = std::io::BufReader::new(conn.try_clone()?);
         let mut raw_action = String::new();
 
-        // TODO XXX This is probably our issue! This call will block if the client doesn't send
-        // anything. Move this and all following into a separate thread (maybe)?
         buf_reader.read_line(&mut raw_action)?;
 
-        let action = serde_json::from_str(raw_action.as_str()).map_err(MuseStatusError::from)?;
-        if let ClientMsg::Command(c) = &action {
-            println!("handling command from client: {}", c);
-            daemon.handle_client_command(c)?;
-        } else {
-            println!("new listener connected");
+        let action = serde_json::from_str(raw_action.as_str())?;
 
-            let serialized = daemon.get_serialized_data()?;
-            send_serialized_data(&mut conn, &serialized)?;
-            daemon.connections.push(conn);
+        #[cfg(debug_assertions)]
+        println!("handling message from new client: {:?}", action);
+
+        match action {
+            ClientMsg::Subscribe(collection) => {
+                daemon.subscribe_client(conn, collection)?;
+            }
+            ClientMsg::Update(collection) => {
+                #[cfg(debug_assertions)]
+                println!("handling update request from client: {:?}", collection);
+
+                daemon.update_collection(&collection);
+            }
+            ClientMsg::Noop => (), // literally do nothing
         }
 
         Ok(())
     }
 
-    fn send_data_to_all(&mut self) -> Result<(), MuseStatusError> {
-        // we're doing this so that get_serialized_data doesn't have to be computed for each
-        // connection
-        let serialized = self.get_serialized_data()?;
+    /// Sends data updates to subscribers.
+    fn send_output_update_to_all(&mut self, new_block_output: BlockOutput) -> Result<(), MuseStatusError> {
+        #[cfg(debug_assertions)]
+        println!("sending output to all subscribers: {:?}", new_block_output);
 
-        let iter = self.connections.iter_mut();
-        for conn in iter {
-            send_serialized_data(conn, &serialized)?;
+        let block_name = new_block_output.block_name.clone();
+        let serialized_output = serde_json::to_string(&DaemonMsg::NewOutput(new_block_output))?;
+
+        for sub in self.subscribers.iter_mut() {
+            if is_block_name_in_collection(&block_name, sub.collection()) {
+                send_serialized_data(sub, &serialized_output)?;
+            } else {
+                #[cfg(debug_assertions)]
+                println!("subscriber skipped when sending update: collection is {:?}", sub.collection());
+            }
         }
 
         Ok(())
     }
 
-    fn get_serialized_data(&self) -> Result<String, MuseStatusError> {
-        let output = DataOutput::from_block_names_and_outputs(&self.block_names, &self.block_outputs);
-        Ok(format!("{}\n", serde_json::to_string(&output)?))
+    /// Sends all data requested by the subscriber, usually to initialize it.
+    fn force_send_data(&self, sub: &mut Subscriber) -> Result<(), MuseStatusError> {
+        let all_outputs = self.block_outputs.iter().map(|t| t.1.to_owned()).collect::<Vec<BlockOutput>>();
+        let msg = DaemonMsg::AllData(all_outputs);
+        send_serialized_data(sub, &serde_json::to_string(&msg)?)
     }
 
-    fn notify(&mut self, who: &str) {
-        for sender in &self.notify_senders {
-            let _ = sender.send(who.to_owned());
+    fn update_collection(&mut self, collection: &Collection) {
+        // get the iterator of requesters to use according to the collection
+        let all_requesters = self.update_request_senders.iter_mut();
+        let requesters: Vec<&mut UpdateRequestSender> = all_requesters
+            .filter(|r| is_block_name_in_collection(&r.0, collection))
+            .collect();
+
+        for requester in requesters {
+            if let Err(e) = requester.send() {
+                eprintln!("updating error: {}", e)
+            }
         }
     }
 }
 
-/// A payload sent from clients to the daemon.
-#[derive(Serialize, Deserialize)]
-pub enum ClientMsg {
-    /// Send a command to the daemon, then disconnect.
-    Command(String),
+/// A struct containing a TcpStream to send data to. The collection defines what data the
+/// subscriber receives.
+struct Subscriber(TcpStream, Collection);
 
-    /// Only connect to the daemon and print outputs.
-    Connect,
+impl Subscriber {
+    /// Convenience function to get the Subscriber's TcpStream.
+    fn stream(&self) -> &TcpStream {
+        &self.0
+    }
+
+    /// Convenience function to get the Subscriber's requested Collection.
+    fn collection(&self) -> &Collection {
+        &self.1
+    }
+}
+
+/// A struct/tuple for a block update request sender.
+struct UpdateRequestSender(String, Sender<()>);
+
+impl UpdateRequestSender {
+    /// Convenience function for sending update requests.
+    fn send(&mut self) -> Result<(), mpsc::SendError<()>> {
+        self.1.send(())
+    }
+}
+
+const PRIMARY_ORDER: &[&str] = &["date", "weather", "mpris"];
+const SECONDARY_ORDER: &[&str] = &["battery", "network", "volume", "brightness"];
+const TERTIARY_ORDER: &[&str] = &[""];
+
+/// An enum for specifying a section of blocks. Used for subscriptions and other commands.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum Collection {
+    /// Primary-level blocks.
+    Primary,
+
+    /// Secondary-level blocks.
+    Secondary,
+
+    /// Tertiary-level blocks.
+    Tertiary,
+
+    /// All blocks.
+    All,
+
+    /// One specific block.
+    One(String),
+
+    /// Many custom-picked blocks.
+    Many(Vec<String>),
 }
 
 /// A payload sent to clients, containing data.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum DaemonMsg {
     /// New output to be sent to clients
-    DataOutput(DataOutput),
+    NewOutput(BlockOutput),
+
+    /// A Vec of BlockOutputs for all data currently known by the daemon.
+    AllData(Vec<BlockOutput>),
 }
 
-/// A collection of all outputs from blocks. Sent to clients as part of a DaemonMsg.
-#[derive(Serialize, Deserialize)]
-pub struct DataOutput {
-    /// Output from primary blocks.
-    pub primary: Vec<BlockOutput>,
+/// A collection of outputs from blocks to be formatted
+#[derive(Serialize, Deserialize, Debug)]
+pub enum DataPayload {
+    /// All blocks ranked by primary, secondary, and tertiary levels
+    Ranked {
+        /// Primary-ranked blocks.
+        primary: Vec<BlockOutput>,
 
-    /// Output from secondary blocks.
-    pub secondary: Vec<BlockOutput>,
+        /// Secondary-ranked blocks.
+        secondary: Vec<BlockOutput>,
 
-    /// Output from tertiary blocks.
-    pub tertiary: Vec<BlockOutput>,
+        /// Tertiary-ranked blocks.
+        tertiary: Vec<BlockOutput>,
+    },
+
+    /// A custom ordering of blocks.
+    Unranked(Vec<BlockOutput>),
 }
 
-impl DataOutput {
-    fn from_block_names_and_outputs(block_names: &BlockNames, outputs: &HashMap<String, BlockOutput>) -> Self {
-        let (mut primary, mut secondary, mut tertiary) = (Vec::new(), Vec::new(), Vec::new());
+impl DataPayload {
+    /// Creates a Ranked DataPayload out of the outputs provided.
+    pub fn ranked(outputs: &HashMap<String, BlockOutput>) -> Self {
+        let (primary, secondary, tertiary) = (
+            Self::make_vec(PRIMARY_ORDER, outputs),
+            Self::make_vec(SECONDARY_ORDER, outputs),
+            Self::make_vec(TERTIARY_ORDER, outputs),
+        );
 
-        for p in &block_names.0 {
-            if let Some(o) = outputs.get(p) {
-                primary.push((*o).clone());
+        Self::Ranked {
+            primary,
+            secondary,
+            tertiary,
+        }
+    }
+
+    /// Creates a Ranked DataPayload out of the outputs provided, but only with primary blocks.
+    pub fn only_primary(outputs: &HashMap<String, BlockOutput>) -> Self {
+        let v = Self::make_vec(PRIMARY_ORDER, outputs);
+
+        Self::Ranked {
+            primary: v,
+            secondary: Default::default(),
+            tertiary: Default::default(),
+        }
+    }
+
+    /// Creates a Ranked DataPayload out of the outputs provided, but only with secondary blocks.
+    pub fn only_secondary(outputs: &HashMap<String, BlockOutput>) -> Self {
+        let v = Self::make_vec(SECONDARY_ORDER, outputs);
+
+        Self::Ranked {
+            primary: Default::default(),
+            secondary: v,
+            tertiary: Default::default(),
+        }
+    }
+
+    /// Creates a Ranked DataPayload out of the outputs provided, but only with tertiary blocks.
+    pub fn only_tertiary(outputs: &HashMap<String, BlockOutput>) -> Self {
+        let v = Self::make_vec(TERTIARY_ORDER, outputs);
+
+        Self::Ranked {
+            primary: Default::default(),
+            secondary: Default::default(),
+            tertiary: v,
+        }
+    }
+
+    /// Creates an Unranked DataPayload out any arbitrary combination of blocks.
+    pub fn from_many(names: &[&str], outputs: &HashMap<String, BlockOutput>) -> Self {
+        let v = Self::make_vec(names, outputs);
+        Self::Unranked(v)
+    }
+
+    /// Creates an Unranked DataPayload out of exactly one arbitrary block.
+    pub fn from_one(name: &str, outputs: &HashMap<String, BlockOutput>) -> Self {
+        Self::Unranked(Self::make_vec(&[name], outputs))
+    }
+
+    fn make_vec(names: &[&str], outputs: &HashMap<String, BlockOutput>) -> Vec<BlockOutput> {
+        let mut v = Vec::new();
+        for name in names {
+            if let Some(o) = outputs.get(*name) {
+                v.push(o.clone());
             }
         }
 
-        for s in &block_names.1 {
-            if let Some(o) = outputs.get(s) {
-                secondary.push((*o).clone());
-            }
-        }
-
-        for t in &block_names.2 {
-            if let Some(o) = outputs.get(t) {
-                tertiary.push((*o).clone());
-            }
-        }
-
-        Self {
-            primary, secondary, tertiary
-        }
+        v
     }
 }
 
-fn send_serialized_data(conn: &mut TcpStream, data: &str) -> Result<(), MuseStatusError> {
-    conn.write_all(data.as_bytes()).map_err(MuseStatusError::from)
+fn is_block_name_in_collection(block_name: &str, collection: &Collection) -> bool {
+    match collection {
+        Collection::All => true,
+        Collection::Primary => PRIMARY_ORDER.iter().any(|&n| n == block_name),
+        Collection::Secondary => SECONDARY_ORDER.iter().any(|&n| n == block_name),
+        Collection::Tertiary => TERTIARY_ORDER.iter().any(|&n| n == block_name),
+        Collection::One(b) => b == block_name,
+        Collection::Many(v) => v.iter().any(|n| n == block_name),
+    }
+}
+
+fn send_serialized_data(
+    sub: &mut Subscriber,
+    serialized_data: &str,
+) -> Result<(), MuseStatusError> {
+    // add a new line to the end of the data so that clients can parse correctly
+    let out = format!("{}\n", serialized_data);
+    sub.stream()
+        .write_all(out.as_bytes())
+        .map_err(MuseStatusError::from)
 }
