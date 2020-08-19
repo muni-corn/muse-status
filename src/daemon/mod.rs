@@ -303,7 +303,7 @@ impl UpdateRequestSender {
 }
 
 const PRIMARY_ORDER: &[&str] = &["date", "weather", "mpris"];
-const SECONDARY_ORDER: &[&str] = &["battery", "network", "volume", "brightness"];
+const SECONDARY_ORDER: &[&str] = &["brightness", "volume", "network", "battery"];
 const TERTIARY_ORDER: &[&str] = &[""];
 
 /// An enum for specifying a section of blocks. Used for subscriptions and other commands.
