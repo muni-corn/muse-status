@@ -138,7 +138,7 @@ impl Daemon {
                 Ok(conn) => {
                     if let Err(e) = Self::handle_connection(daemon_arc.clone(), conn) {
                         eprintln!(
-                            "there was a problem handling a connection to the daemon ({}), but the daemon will keep running",
+                            "there was a problem handling a new connection ({}), but the daemon will keep running",
                             e
                         );
                     }
@@ -201,7 +201,8 @@ impl Daemon {
         daemon_arc: DaemonMutexArc,
         conn: TcpStream,
     ) -> Result<(), MuseStatusError> {
-        let mut daemon = daemon_arc.lock().unwrap();
+        #[cfg(debug_assertions)]
+        println!("handling a new connection");
 
         let mut buf_reader = std::io::BufReader::new(conn.try_clone()?);
         let mut raw_action = String::new();
@@ -212,6 +213,8 @@ impl Daemon {
 
         #[cfg(debug_assertions)]
         println!("handling message from new client: {:?}", action);
+
+        let mut daemon = daemon_arc.lock().unwrap();
 
         match action {
             ClientMsg::Subscribe(collection) => {
