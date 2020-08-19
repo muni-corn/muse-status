@@ -33,7 +33,7 @@ impl Bit {
                 let rgba = f.color_to_rgba(&c);
                 match &self.font {
                     Some(f) => format!(
-                        "<span color=\"#{}\" font=\"{}\">{}</span>",
+                        "<span color=\"#{}\" font_desc=\"{}\">{}</span>",
                         rgba.hex_string(Mode::JsonProtocol),
                         f,
                         self.text
@@ -46,7 +46,7 @@ impl Bit {
                 }
             }
             None => match &self.font {
-                Some(f) => format!("<span font=\"{}\">{}</span>", f, self.text), // font, but no color
+                Some(f) => format!("<span font_desc=\"{}\">{}</span>", f, self.text), // font, but no color
                 None => self.text.clone(), // no color and no font
             },
         }
