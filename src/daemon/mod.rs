@@ -192,7 +192,6 @@ impl Daemon {
         // register the subscriber
         self.subscribers.push(sub);
 
-        #[cfg(debug_assertions)]
         println!("new subscriber successfully connected");
 
         Ok(())
