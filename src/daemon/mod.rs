@@ -207,27 +207,29 @@ impl Daemon {
         let mut buf_reader = std::io::BufReader::new(conn.try_clone()?);
         let mut raw_action = String::new();
 
-        buf_reader.read_line(&mut raw_action)?;
+        thread::Builder::new().name("single client handler".to_string()).spawn(move || {
+            buf_reader.read_line(&mut raw_action).unwrap();
 
-        let action = serde_json::from_str(raw_action.as_str())?;
+            let action = serde_json::from_str(raw_action.as_str()).unwrap();
 
-        #[cfg(debug_assertions)]
-        println!("handling message from new client: {:?}", action);
+            #[cfg(debug_assertions)]
+            println!("handling message from new client: {:?}", action);
 
-        let mut daemon = daemon_arc.lock().unwrap();
+            let mut daemon = daemon_arc.lock().unwrap();
 
-        match action {
-            ClientMsg::Subscribe(collection) => {
-                daemon.subscribe_client(conn, collection)?;
+            match action {
+                ClientMsg::Subscribe(collection) => {
+                    daemon.subscribe_client(conn, collection).unwrap();
+                }
+                ClientMsg::Update(collection) => {
+                    #[cfg(debug_assertions)]
+                    println!("handling update request from client: {:?}", collection);
+
+                    daemon.update_collection(&collection);
+                }
+                ClientMsg::Noop => (), // literally do nothing
             }
-            ClientMsg::Update(collection) => {
-                #[cfg(debug_assertions)]
-                println!("handling update request from client: {:?}", collection);
-
-                daemon.update_collection(&collection);
-            }
-            ClientMsg::Noop => (), // literally do nothing
-        }
+        }).unwrap();
 
         Ok(())
     }
