@@ -35,9 +35,15 @@ impl Client {
     /// Noop does.
     pub fn act(self) -> Result<(), MuseStatusError> {
         if let ClientMsg::Noop = &self.action {
+            #[cfg(debug_assertions)]
+            println!("doing nothing; exiting");
+
             // girl bye
             Ok(())
         } else {
+            #[cfg(debug_assertions)]
+            println!("sending action to daemon: {:?}", self.action);
+
             // for anything else, we'll need a connection to the daemon.
             let mut stream = get_daemon_connection();
             stream.write_all(format!("{}\n", serde_json::to_string(&self.action)?).as_bytes())?;
@@ -196,7 +202,7 @@ impl ClientMsg {
                 msg_type = Some(ClientMsgType::Subscribe);
             } else if arg.starts_with('u') || arg.starts_with('n') {
                 msg_type = Some(ClientMsgType::Update);
-            } else if arg.starts_with('p') {
+            } else if arg.starts_with("pr") {
                 collection = Some(Collection::Primary);
             } else if arg.starts_with("se") {
                 collection = Some(Collection::Secondary);
