@@ -10,16 +10,16 @@ pub mod color;
 // TODO create a separate module for Banner
 
 use crate::daemon::DataPayload;
+use crate::errors::{BasicError, MuseStatusError};
 use crate::format::blocks::output::{BlockOutput, BlockOutputContent};
-use crate::errors::{MuseStatusError, BasicError};
 use crate::utils;
 use color::{Color, RGBA};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::str::FromStr;
 
-/// Four spaces.
-const MARKUP_SEPARATOR: &str = "    ";
+/// Eight spaces.
+const MARKUP_SEPARATOR: &str = "        ";
 
 /// Attention provides a way to easily apply colors to a Block, without actually passing any RGBA
 /// values.
@@ -56,6 +56,26 @@ pub enum Mode {
 
     /// Plain markup output.
     Markup,
+}
+
+impl Default for Mode {
+    fn default() -> Self {
+        Self::JsonProtocol
+    }
+}
+
+impl FromStr for Mode {
+    type Err = MuseStatusError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "i3" => Ok(Self::JsonProtocol),
+            "lemon" => Ok(Self::Lemonbar),
+            "plain" | "markup" => Ok(Self::Markup),
+            _ => Err(MuseStatusError::from(BasicError {
+                message: format!("this format isn't recognized: `{}`", s),
+            })),
+        }
+    }
 }
 
 /// Fonts, colors and more for muse-status
@@ -149,7 +169,7 @@ impl Formatter {
                     "-s" | "--secondary-color" => formatter.set_secondary_color(&value)?,
                     "-f" | "--font" => formatter.set_text_font(&value),
                     "-i" | "--icon-font" => formatter.set_icon_font(&value),
-                    "-m" | "--mode" => formatter.set_mode_from_str(&value)?,
+                    "-m" | "--mode" => formatter.set_format_mode(value.parse()?),
                     _ => (),
                 }
             } else {
@@ -170,23 +190,31 @@ impl Formatter {
             Mode::JsonProtocol => {
                 let mut json_strings = Vec::new();
                 match data {
-                    DataPayload::Ranked { primary, secondary, tertiary } => {
+                    DataPayload::Ranked {
+                        primary,
+                        secondary,
+                        tertiary,
+                    } => {
                         for block_output in tertiary
                             .iter()
                             .chain(secondary.iter().chain(primary.iter().rev()))
+                        {
+                            if let Some(jps) =
+                                self.block_output_as_json_protocol_string(block_output)
                             {
-                                if let Some(jps) = self.block_output_as_json_protocol_string(block_output) {
-                                    json_strings.push(jps)
-                                }
-                            }
-                    }
-                    DataPayload::Unranked(outputs) => {
-                        for block_output in outputs {
-                            if let Some(jps) = self.block_output_as_json_protocol_string(&block_output) {
                                 json_strings.push(jps)
                             }
                         }
-                    },
+                    }
+                    DataPayload::Unranked(outputs) => {
+                        for block_output in outputs {
+                            if let Some(jps) =
+                                self.block_output_as_json_protocol_string(&block_output)
+                            {
+                                json_strings.push(jps)
+                            }
+                        }
+                    }
                 }
                 let joined = json_strings.join(",");
                 format!(",[{}]", joined)
@@ -195,15 +223,19 @@ impl Formatter {
             Mode::Markup => {
                 let mut markup_strings = Vec::new();
                 match data {
-                    DataPayload::Ranked { primary, secondary, tertiary } => {
+                    DataPayload::Ranked {
+                        primary,
+                        secondary,
+                        tertiary,
+                    } => {
                         for block_output in tertiary
                             .iter()
                             .chain(secondary.iter().chain(primary.iter().rev()))
-                            {
-                                if let Some(jps) = self.block_output_as_markup(block_output) {
-                                    markup_strings.push(jps)
-                                }
+                        {
+                            if let Some(jps) = self.block_output_as_markup(block_output) {
+                                markup_strings.push(jps)
                             }
+                        }
                     }
                     DataPayload::Unranked(outputs) => {
                         for block_output in outputs {
@@ -211,7 +243,7 @@ impl Formatter {
                                 markup_strings.push(jps)
                             }
                         }
-                    },
+                    }
                 }
 
                 markup_strings.join(MARKUP_SEPARATOR)
@@ -305,26 +337,6 @@ impl Formatter {
             Color::Secondary => self.secondary_color.clone(),
             Color::Other(rgba) => rgba.clone(),
         }
-    }
-
-    /// Sets the Formatter's mode from the string `s`. j
-    pub fn set_mode_from_str(&mut self, s: &str) -> Result<(), MuseStatusError> {
-        match s {
-            "i3" => {
-                self.set_format_mode(Mode::JsonProtocol);
-            }
-            "lemon" => {
-                self.set_format_mode(Mode::Lemonbar);
-            }
-            "plain" | "markup" => {
-                self.set_format_mode(Mode::Markup);
-            }
-            _ => return Err(MuseStatusError::from(BasicError {
-                message: format!("this format isn't recognized: `{}`", s),
-            }))
-        }
-
-        Ok(())
     }
 
     /// Formats the BlockOutput for the i3 JSON protocol. None if body is None.
