@@ -1,24 +1,23 @@
 use crate::daemon::{Collection, DaemonMsg, DataPayload};
-use crate::errors::{BasicError, MuseStatusError};
+use crate::errors::MuseStatusError;
 use crate::format::blocks::BlockOutput;
 use crate::format::Formatter;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::error::Error;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 
 /// A Client that connects to the Daemon and receives data.
 pub struct Client {
-    action: ClientMsg,
+    args: ClientArgs,
     data: HashMap<String, BlockOutput>,
 }
 
 impl Client {
-    /// Returns a new Client with action and formatter parsed from the command line arguments
+    /// Returns a new Client with options parsed from command line arguments
     pub fn new() -> Result<Self, MuseStatusError> {
         Ok(Self {
-            action: ClientMsg::from_env(),
+            args: ClientArgs::from_env()?,
             data: HashMap::new(),
         })
     }
@@ -34,7 +33,7 @@ impl Client {
     /// know it was summoned. You'll just think that nothing happened, because that's exactly what
     /// Noop does.
     pub fn act(self) -> Result<(), MuseStatusError> {
-        if let ClientMsg::Noop = &self.action {
+        if let ClientMsg::Noop = &self.args.client_msg {
             #[cfg(debug_assertions)]
             println!("doing nothing; exiting");
 
@@ -42,16 +41,16 @@ impl Client {
             Ok(())
         } else {
             #[cfg(debug_assertions)]
-            println!("sending action to daemon: {:?}", self.action);
+            println!("sending action to daemon: {:?}", self.args.client_msg);
 
             // for anything else, we'll need a connection to the daemon.
             let mut stream = get_daemon_connection();
-            stream.write_all(format!("{}\n", serde_json::to_string(&self.action)?).as_bytes())?;
+            stream.write_all(format!("{}\n", serde_json::to_string(&self.args.client_msg)?).as_bytes())?;
 
             // if Subscribe, handle the subscription. if Update, send request and quit.
-            // self.action is cloned in the case that we handle a subscription and `self` must be
+            // self.args.client_msg is cloned in the case that we handle a subscription and `self` must be
             // moved
-            if let ClientMsg::Subscribe(c) = self.action.clone() {
+            if let ClientMsg::Subscribe(c) = self.args.client_msg.clone() {
                 self.handle_subscription(stream, &c);
             } else {
                 // if Update or somehow Noop, the client does not need to maintain its connection
@@ -165,86 +164,73 @@ pub enum ClientMsg {
     Noop,
 }
 
-impl ClientMsg {
-    /// Creates a ClientMsg from arguments passed through the command line.
-    pub fn from_env() -> Self {
+impl Default for ClientMsg {
+    fn default() -> Self {
+        Self::Subscribe(Collection::All)
+    }
+}
+
+#[derive(Default)]
+struct ClientArgs {
+    client_msg: ClientMsg,
+    force: bool,
+    formatter: Formatter,
+}
+
+impl ClientArgs {
+    pub fn from_env() -> Result<Self, MuseStatusError> {
+        let mut result = Self::default();
+
         // a temporary type to pick up the pieces passed through the command line. (it would be
-        // difficult to get the message type and the collection argument at the same time)
+        // difficult to get the message type and the collection argument at the same time, so we
+        // have separate variables for `msg_type` and `collection`)
         enum ClientMsgType {
             Subscribe,
             Update,
         }
 
-        let env = std::env::args();
+        // default values
+        let mut msg_type = ClientMsgType::Subscribe;
+        let mut collection = Collection::All;
 
-        let mut force_update = false;
-        let mut collection = None;
-        let mut msg_type = None;
+        let mut args = std::env::args();
 
-        for arg in env {
-            if arg == "--force" || arg == "-f" {
-                force_update = true;
-                continue;
-            } else if arg.starts_with('-') || arg.is_empty() {
-                continue;
-            }
+        while let Some(arg) = args.next() {
+            let mut extract_next_value = || args.next().ok_or_else(|| MuseStatusError::from(format!("`{}` requires a value", arg)));
 
-            // check if arg starts with any of the following:
-            //      "su" => subscribe
-            //      "l"  => listen
-            //      "u"  => update
-            //      "n"  => notify
-            //      "p"  => primary
-            //      "se" => secondary
-            //      "t"  => tertiary
-            //      "a"  => all
-            if arg.starts_with("su") || arg.starts_with('l') {
-                msg_type = Some(ClientMsgType::Subscribe);
-            } else if arg.starts_with('u') || arg.starts_with('n') {
-                msg_type = Some(ClientMsgType::Update);
-            } else if arg.starts_with("pr") {
-                collection = Some(Collection::Primary);
-            } else if arg.starts_with("se") {
-                collection = Some(Collection::Secondary);
-            } else if arg.starts_with('t') {
-                collection = Some(Collection::Tertiary);
-            } else if arg.starts_with('a') {
-                collection = Some(Collection::All);
-            } else {
-                assert!(!arg.starts_with('-'));
-                collection = Some(Collection::One(arg));
-            }
-        }
+            match arg.as_str() {
+                "sub" | "subscribe" => msg_type = ClientMsgType::Subscribe,
+                "u" | "update" | "n" | "notify" => msg_type = ClientMsgType::Update,
+                "p" | "primary" => collection = Collection::Primary,
+                "s" | "secondary" => collection = Collection::Secondary,
+                "t" | "tertiary" => collection = Collection::Tertiary,
+                "a" | "all" => collection = Collection::All,
 
-        // assemble the msg
-        if let Some(t) = msg_type {
-            match collection {
-                Some(c) => match t {
-                    ClientMsgType::Subscribe => Self::Subscribe(c),
-                    ClientMsgType::Update => Self::Update(c),
-                },
-                None => {
-                    match t {
-                        ClientMsgType::Subscribe => Self::Subscribe(Collection::All),
-                        ClientMsgType::Update => {
-                            if force_update {
-                                Self::Update(Collection::All)
-                            } else {
-                                println!("what do you want to update? try `update all` or `update primary`");
-                                Self::Noop
-                            }
+                "-p" | "--primary-color" => result.formatter.set_primary_color(&extract_next_value()?)?,
+                "-s" | "--secondary-color" => result.formatter.set_secondary_color(&extract_next_value()?)?,
+                "-t" | "--font" | "--text-font" => result.formatter.set_text_font(&extract_next_value()?),
+                "-i" | "--icon-font" => result.formatter.set_icon_font(&extract_next_value()?),
+                "-m" | "--mode" => result.formatter.set_format_mode(extract_next_value()?.parse()?),
+                "-f" | "--force" => result.force = true,
+                _ => {
+                    if arg.starts_with('-') {
+                        eprintln!("heads up: `{}` is not a flag muse-status recognizes, but we'll go on anyways", arg)
+                    } else {
+                        match collection {
+                            Collection::One(o) => collection = Collection::Many(vec![o, arg]),
+                            Collection::Many(ref mut m) => m.push(arg),
+                            _ => collection = Collection::One(arg)
                         }
                     }
-                }
+                },
             }
-        } else {
-            Self::default()
         }
-    }
-}
 
-impl Default for ClientMsg {
-    fn default() -> Self {
-        Self::Subscribe(Collection::All)
+        result.client_msg = match msg_type {
+            ClientMsgType::Subscribe => ClientMsg::Subscribe(collection),
+            ClientMsgType::Update => ClientMsg::Update(collection),
+        };
+
+        Ok(result)
     }
 }
