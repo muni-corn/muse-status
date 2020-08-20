@@ -13,6 +13,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
+use retain_mut::RetainMut;
 
 type BlockVec = Vec<Box<dyn Block>>;
 type BlockOutputs = HashMap<String, BlockOutput>;
@@ -242,14 +243,21 @@ impl Daemon {
         let block_name = new_block_output.block_name.clone();
         let serialized_output = serde_json::to_string(&DaemonMsg::NewOutput(new_block_output))?;
 
-        for sub in self.subscribers.iter_mut() {
+        // send updates, only retaining subscribers that were successfully sent updates
+        self.subscribers.retain_mut(|sub| {
             if is_block_name_in_collection(&block_name, sub.collection()) {
-                send_serialized_data(sub, &serialized_output)?;
+                if let Err(e) = send_serialized_data(sub, &serialized_output) {
+                    eprintln!("there was an error: {}", e);
+                    false
+                } else {
+                    true
+                }
             } else {
                 #[cfg(debug_assertions)]
                 println!("subscriber skipped when sending update: collection is {:?}", sub.collection());
+                true
             }
-        }
+        });
 
         Ok(())
     }
