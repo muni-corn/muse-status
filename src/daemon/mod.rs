@@ -247,7 +247,7 @@ impl Daemon {
         self.subscribers.retain_mut(|sub| {
             if is_block_name_in_collection(&block_name, sub.collection()) {
                 if let Err(e) = send_serialized_data(sub, &serialized_output) {
-                    eprintln!("there was an error: {}", e);
+                    eprintln!("there was an error ({}). the subscriber will be ignored from now on", e);
                     false
                 } else {
                     true
