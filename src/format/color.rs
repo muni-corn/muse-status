@@ -43,9 +43,12 @@ impl FromStr for RGBA {
     type Err = RGBAParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.len() {
+        // remove any characters that aren't hex digits (like '#')
+        // 50 points to Rust for including char::is_ascii_hexdigit :D:D:D:D
+        let raw: String = s.chars().filter(|c| c.is_ascii_hexdigit()).collect();
+        match raw.len() {
             6 => {
-                let raw_int = i32::from_str_radix(s, 16)?;
+                let raw_int = i32::from_str_radix(&raw, 16)?;
                 Ok(Self {
                     r: (raw_int >> 16 & 0xff) as u8,
                     g: (raw_int >> 8 & 0xff) as u8,
@@ -54,7 +57,7 @@ impl FromStr for RGBA {
                 })
             }
             8 => {
-                let raw_int = i32::from_str_radix(s, 16)?;
+                let raw_int = i32::from_str_radix(&raw, 16)?;
                 Ok(Self {
                     r: (raw_int >> 24 & 0xff) as u8,
                     g: (raw_int >> 16 & 0xff) as u8,
