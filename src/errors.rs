@@ -29,6 +29,14 @@ pub enum MuseStatusError {
     RGBAParse(RGBAParseError),
 }
 
+impl From<String> for MuseStatusError {
+    fn from(s: String) -> Self {
+        Self::Basic(BasicError {
+            message: s
+        })
+    }
+}
+
 impl From<serde_json::error::Error> for MuseStatusError {
     fn from(e: serde_json::error::Error) -> Self {
         Self::Basic(BasicError {
