@@ -230,7 +230,7 @@ impl Formatter {
                     } => {
                         for block_output in tertiary
                             .iter()
-                            .chain(secondary.iter().chain(primary.iter().rev()))
+                            .chain(secondary.iter().chain(primary.iter()))
                         {
                             if let Some(jps) = self.block_output_as_markup(block_output) {
                                 markup_strings.push(jps)
