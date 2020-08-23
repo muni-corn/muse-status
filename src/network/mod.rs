@@ -72,8 +72,7 @@ impl NetworkBlock {
     }
 
     fn packet_loss(&self) -> Result<bool, UpdateError> {
-        let mut ping_cmd = std::process::Command::new("ping");
-        ping_cmd.args(&[
+        let mut ping_cmd = std::process::Command::new("ping").args(&[
             "-c",
             "2",
             "-W",
@@ -83,15 +82,10 @@ impl NetworkBlock {
             "8.8.8.8",
         ]);
 
-        let status = match ping_cmd.status() {
-            Ok(s) => s,
-            Err(e) => {
-                return Err(UpdateError {
-                    block_name: self.name().to_string(),
-                    message: format!("couldn't execute `ping`: {}", e),
-                })
-            }
-        };
+        let status = ping_cmd.status().map_err(|e| UpdateError {
+            block_name: self.name().to_string(),
+            message: format!("couldn't execute `ping`: {}", e),
+        })?;
 
         Ok(!status.success())
     }
@@ -128,39 +122,25 @@ impl Block for NetworkBlock {
         "network"
     }
 
-    // update updates the network information
+    // Updates the network information
     fn update(&mut self) -> Result<(), UpdateError> {
         self.next_update_time =
             chrono::Local::now() + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS);
 
         // get interface
-        let iface = match get_interface(&self.iface_name) {
-            Ok(i) => i,
-            Err(e) => {
-                return Err(UpdateError {
-                    block_name: self.name().to_string(),
-                    message: format!("couldn't get interface: {}", e),
-                })
-            }
-        };
+        let iface = get_interface(&self.iface_name).map_err(|e| UpdateError {
+            block_name: self.name().to_string(),
+            message: format!("couldn't get interface: {}", e),
+        })?;
 
         // get station
-        let station = match iface.get_station_info() {
-            Ok(i) => i,
-            Err(e) => {
-                return Err(UpdateError {
-                    block_name: self.name().to_string(),
-                    message: format!("{}", e),
-                })
-            }
-        };
+        let station = iface.get_station_info().map_err(|e| UpdateError {
+            block_name: self.name().to_string(),
+            message: format!("{}", e),
+        })?;
 
         // get ssid
-        self.ssid = if let Some(ssid) = &iface.ssid {
-            Some(nl80211::parse_string(&ssid))
-        } else {
-            None
-        };
+        self.ssid = iface.ssid.map(|ssid| nl80211::parse_string(&ssid));
 
         // get signal strength
         if let Some(s) = station.signal {
