@@ -52,7 +52,12 @@ pub trait Block: Send + Sync {
 
                 let now = chrono::Local::now();
                 if let Some(d) = next_update_time {
-                    let duration = (d - now).to_std().unwrap();
+                    let duration = if let Ok(d) = (d - now).to_std() {
+                        d
+                    } else {
+                        std::time::Duration::from_secs(5)
+                    };
+
                     thread::sleep(duration);
                 } else {
                     break;
