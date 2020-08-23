@@ -31,9 +31,27 @@ impl Default for NetworkBlock {
             strength_percent: 0,
             status: NetworkStatus::Disconnected,
 
-            connection_icons: vec!['\u{F092F}', '\u{F091F}', '\u{F0922}', '\u{F0925}', '\u{F0928}'],
-            packet_loss_icons: vec!['\u{F092B}', '\u{F0920}', '\u{F0923}', '\u{F0926}', '\u{F0929}'],
-            vpn_icons: vec!['\u{F092C}', '\u{F0921}', '\u{F0924}', '\u{F0927}', '\u{F092A}'],
+            connection_icons: vec![
+                '\u{F092F}',
+                '\u{F091F}',
+                '\u{F0922}',
+                '\u{F0925}',
+                '\u{F0928}',
+            ],
+            packet_loss_icons: vec![
+                '\u{F092B}',
+                '\u{F0920}',
+                '\u{F0923}',
+                '\u{F0926}',
+                '\u{F0929}',
+            ],
+            vpn_icons: vec![
+                '\u{F092C}',
+                '\u{F0921}',
+                '\u{F0924}',
+                '\u{F0927}',
+                '\u{F092A}',
+            ],
             disconnected_icon: '\u{F092B}',
             disabled_icon: '\u{F092E}',
 
@@ -55,7 +73,15 @@ impl NetworkBlock {
 
     fn packet_loss(&self) -> Result<bool, UpdateError> {
         let mut ping_cmd = std::process::Command::new("ping");
-        ping_cmd.args(&["ping", "-c", "2", "-W", "2", "-I", &self.iface_name, "8.8.8.8"]);
+        ping_cmd.args(&[
+            "-c",
+            "2",
+            "-W",
+            "2",
+            "-I",
+            &self.iface_name,
+            "8.8.8.8",
+        ]);
 
         let status = match ping_cmd.status() {
             Ok(s) => s,
@@ -84,7 +110,8 @@ impl NetworkBlock {
                 };
 
                 // get the icon
-                let mut icon_index: usize = (icons.len() as i32 * self.strength_percent / 100) as usize;
+                let mut icon_index: usize =
+                    (icons.len() as i32 * self.strength_percent / 100) as usize;
 
                 // constrains index
                 icon_index = icon_index.min(icons.len() - 1);
@@ -109,13 +136,15 @@ impl Block for NetworkBlock {
         // get interface
         let iface = match get_interface(&self.iface_name) {
             Ok(i) => i,
-            Err(e) => return Err(UpdateError {
-                block_name: self.name().to_string(),
-                message: format!("couldn't get interface: {}", e)
-            })
+            Err(e) => {
+                return Err(UpdateError {
+                    block_name: self.name().to_string(),
+                    message: format!("couldn't get interface: {}", e),
+                })
+            }
         };
 
-        // strength
+        // get station
         let station = match iface.get_station_info() {
             Ok(i) => i,
             Err(e) => {
@@ -133,7 +162,6 @@ impl Block for NetworkBlock {
             None
         };
 
-
         // get signal strength
         if let Some(s) = station.signal {
             let dbm = nl80211::parse_i8(&s);
@@ -145,13 +173,20 @@ impl Block for NetworkBlock {
         }
 
         // detect packet loss
-        // if self.packet_loss()? {
-        //     self.status = NetworkStatus::PacketLoss;
-        // } else {
-        //     self.status = NetworkStatus::Connected;
-        // }
-
-        Ok(())
+        match self.packet_loss() {
+            Ok(p) => {
+                if p {
+                    self.status = NetworkStatus::PacketLoss;
+                } else {
+                    self.status = NetworkStatus::Connected;
+                }
+                Ok(())
+            }
+            Err(e) => {
+                self.status = NetworkStatus::PacketLoss;
+                Err(e)
+            }
+        }
     }
 
     fn next_update_time(&self) -> Option<DateTime<Local>> {
@@ -160,40 +195,37 @@ impl Block for NetworkBlock {
 
     fn output(&self) -> Option<BlockOutputContent> {
         match &self.status {
-            NetworkStatus::Connected => Some(BlockOutputContent::from(NiceOutput {
-                attention: Attention::Normal,
-                icon: self.get_icon(),
-                primary_text: self.ssid.clone().unwrap_or_else(String::new),
-                secondary_text: self.status.to_string(),
-            })),
+            NetworkStatus::Connected | NetworkStatus::PacketLoss => {
+                Some(BlockOutputContent::from(NiceOutput {
+                    attention: Attention::Normal,
+                    icon: self.get_icon(),
+                    primary_text: self.ssid.clone().unwrap_or_else(String::new),
+                    secondary_text: self.status.to_string(),
+                }))
+            }
             _ => None,
         }
     }
 }
 
 // only returns one interface that matches the name given
-fn get_interface(
-    interface_name: &str,
-) -> Result<nl80211::Interface, BasicError> {
+fn get_interface(interface_name: &str) -> Result<nl80211::Interface, BasicError> {
     // get all interfaces
     let interfaces = match Socket::connect() {
         Ok(mut s) => match s.get_interfaces_info() {
             Ok(i) => i,
             Err(e) => {
                 return Err(BasicError {
-                    message: format!(
-                                 "couldn't create network block (getting interfaces): {}",
-                                 e
-                             ),
+                    message: format!("couldn't create network block (getting interfaces): {}", e),
                 })
             }
         },
         Err(e) => {
             return Err(BasicError {
                 message: format!(
-                             "couldn't create network block (connecting to netlink socket): {}",
-                             e
-                         ),
+                    "couldn't create network block (connecting to netlink socket): {}",
+                    e
+                ),
             })
         }
     };
@@ -207,7 +239,7 @@ fn get_interface(
     }
 
     Err(BasicError {
-        message: format!("network interface not found: {}", interface_name)
+        message: format!("network interface not found: {}", interface_name),
     })
 }
 
@@ -257,7 +289,7 @@ impl NetworkStatus {
     fn to_string(&self) -> Option<String> {
         match self {
             Self::Disconnected => Some(String::from("No connection")),
-            Self::PacketLoss => Some(String::from("Connection problems")),
+            Self::PacketLoss => Some(String::from("Connection problem")),
             Self::Connecting => Some(String::from("Connecting")),
             Self::Connected => None,
             Self::SignInRequired => Some(String::from("Sign-in required")),
