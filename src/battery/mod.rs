@@ -47,7 +47,6 @@ struct BatteryRead {
 
 const SYS_POWER_SUPPLY_BASE_DIR: &str = "/sys/class/power_supply/";
 const MAX_READS: i32 = 15; // used for moving averages
-const TIME_FORMAT: &str = "%-I:%M %P";
 
 /// Data block for battery reports and estimates
 pub struct SmartBatteryBlock {
@@ -236,7 +235,7 @@ impl Block for SmartBatteryBlock {
                                 Some(format!(
                                     "{} {}",
                                     prefix,
-                                    completion_time.format(TIME_FORMAT)
+                                    completion_time.format(crate::date::TIME_FORMAT)
                                 ))
                             }
                         }
