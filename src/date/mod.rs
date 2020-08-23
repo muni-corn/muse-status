@@ -7,8 +7,8 @@ use chrono::{DateTime, Local};
 use std::io::Cursor;
 use rodio::{Device, Source};
 
-// const TIME_FORMAT: &str = "%-I:%M %P";
-const TIME_FORMAT: &str = "%-H:%M";
+/// The format with which to format time strings.
+pub const TIME_FORMAT: &str = "%-I:%M %P";
 const DATE_FORMAT: &str = "%a, %b %-d";
 const CLOCK_ICONS: [char; 12] = ['\u{F1456}', '\u{F144B}', '\u{F144C}', '\u{F144D}', '\u{F144E}', '\u{F144F}', '\u{F1450}', '\u{F1451}', '\u{F1452}', '\u{F1453}', '\u{F1454}', '\u{F1455}'];
 
