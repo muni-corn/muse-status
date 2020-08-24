@@ -72,7 +72,8 @@ impl NetworkBlock {
     }
 
     fn packet_loss(&self) -> Result<bool, UpdateError> {
-        let mut ping_cmd = std::process::Command::new("ping").args(&[
+        let mut ping_cmd = std::process::Command::new("ping");
+        ping_cmd.args(&[
             "-c",
             "2",
             "-W",

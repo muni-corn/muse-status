@@ -17,19 +17,39 @@ impl VolumeBlock {
         Default::default()
     }
 
+    const MAX_WAIT_SECONDS: u64 = 30;
+
+    fn get_volume_info(&self) -> String {
+        let mut wait_time_seconds = 1;
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(wait_time_seconds));
+
+            if let Ok(output) = process::Command::new("amixer")
+                .args(&["sget", "Master"])
+                .output()
+            {
+                if let Ok(info) = String::from_utf8(output.stdout) {
+                    if let Some(last_line) = info.lines().last() {
+                        return last_line.to_string();
+                    }
+                }
+            }
+
+            // exponential falloff
+            if wait_time_seconds < Self::MAX_WAIT_SECONDS {
+                wait_time_seconds = Self::MAX_WAIT_SECONDS.min(wait_time_seconds * 2);
+            }
+        }
+    }
+
     // returns the current volume percentage as an i32, or zero
     // if muted
     fn update_current_volume(&mut self) -> Result<(), UpdateError> {
-        let output = process::Command::new("amixer")
-            .args(&["sget", "Master"])
-            .output()
-            .unwrap();
-        let info = String::from_utf8(output.stdout).unwrap();
-        let last_line = info.lines().last().unwrap();
+        let info = self.get_volume_info();
 
-        match last_line.chars().position(|c| c == '[') {
+        match info.chars().position(|c| c == '[') {
             Some(i) => {
-                let line_end = &last_line[i..];
+                let line_end = &info[i..];
 
                 // first, are we muted?
                 self.muted = if line_end.contains("on") {
@@ -53,18 +73,10 @@ impl VolumeBlock {
                         .filter(|c| c.is_digit(10))
                         .collect::<String>();
 
-                    self.current_volume = match raw_percent.parse::<i32>() {
-                        Ok(p) => p,
-                        Err(e) => {
-                            return Err(UpdateError {
-                                block_name: String::from("volume"),
-                                message: format!(
-                                    "couldn't parse volume from `{}`: {}",
-                                    raw_percent, e
-                                ),
-                            })
-                        }
-                    };
+                    self.current_volume = raw_percent.parse::<i32>().map_err(|e| UpdateError {
+                        block_name: String::from("volume"),
+                        message: format!("couldn't parse volume from `{}`: {}", raw_percent, e),
+                    })?;
                 }
 
                 Ok(())
