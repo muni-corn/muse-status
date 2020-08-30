@@ -85,7 +85,6 @@ pub struct Formatter {
     secondary_color: RGBA,
     alarm_color: RGBA,
     warning_color: RGBA,
-    text_font: String,
     icon_font: String,
 
     /// A banner queue.
@@ -142,7 +141,6 @@ impl Default for Formatter {
                 b: 0x00,
                 a: 0xff,
             },
-            text_font: String::from("sans 10"),
             icon_font: String::from("Material Design Icons 12"),
 
             banners: VecDeque::new(),
@@ -167,7 +165,6 @@ impl Formatter {
                 match arg.as_str() {
                     "-p" | "--primary-color" => formatter.set_primary_color(&value)?,
                     "-s" | "--secondary-color" => formatter.set_secondary_color(&value)?,
-                    "-f" | "--font" => formatter.set_text_font(&value),
                     "-i" | "--icon-font" => formatter.set_icon_font(&value),
                     "-m" | "--mode" => formatter.set_format_mode(value.parse()?),
                     _ => (),
@@ -275,11 +272,6 @@ impl Formatter {
     /// Activates and displays a banner.
     pub fn banner(&mut self, _banner: Banner) {
         unimplemented!()
-    }
-
-    /// Sets the text font of the Formatter.
-    pub fn set_text_font(&mut self, font: &str) {
-        self.text_font = font.to_owned();
     }
 
     /// Sets the icon font of the Formatter.

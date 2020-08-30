@@ -106,14 +106,14 @@ impl NiceOutput {
         let primary_bit = Bit {
             text: self.primary_text.clone(),
             color: Some(Color::Other(primary_color)),
-            font: Some(f.text_font.clone()),
+            font: None,
         };
 
         let secondary_bit_opt = match &self.secondary_text {
             Some(t) => Some(Bit {
                 text: t.clone(),
                 color: Some(Color::Other(secondary_color)),
-                font: Some(f.text_font.clone()),
+                font: None,
             }),
             None => None,
         };
