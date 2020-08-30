@@ -208,7 +208,6 @@ impl ClientArgs {
 
                 "-p" | "--primary-color" => result.formatter.set_primary_color(&extract_next_value()?)?,
                 "-s" | "--secondary-color" => result.formatter.set_secondary_color(&extract_next_value()?)?,
-                "-t" | "--font" | "--text-font" => result.formatter.set_text_font(&extract_next_value()?),
                 "-i" | "--icon-font" => result.formatter.set_icon_font(&extract_next_value()?),
                 "-m" | "--mode" => result.formatter.set_format_mode(extract_next_value()?.parse()?),
                 "-f" | "--force" => result.force = true,
