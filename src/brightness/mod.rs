@@ -1,7 +1,6 @@
 use crate::errors::*;
 use crate::format::blocks::output::*;
 use crate::format::blocks::*;
-use crate::format::color::Color;
 use crate::format::Attention;
 use crate::utils;
 use std::path::PathBuf;
