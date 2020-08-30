@@ -22,8 +22,6 @@ impl VolumeBlock {
     fn get_volume_info(&self) -> String {
         let mut wait_time_seconds = 1;
         loop {
-            std::thread::sleep(std::time::Duration::from_secs(wait_time_seconds));
-
             if let Ok(output) = process::Command::new("amixer")
                 .args(&["sget", "Master"])
                 .output()
@@ -34,6 +32,8 @@ impl VolumeBlock {
                     }
                 }
             }
+
+            std::thread::sleep(std::time::Duration::from_secs(wait_time_seconds));
 
             // exponential falloff
             if wait_time_seconds < Self::MAX_WAIT_SECONDS {
