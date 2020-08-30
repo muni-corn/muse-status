@@ -4,6 +4,7 @@ use crate::format::blocks::*;
 use crate::format::Attention;
 use chrono::{DateTime, Local};
 use nl80211::Socket;
+use std::process::Command;
 
 /// A block that transmits wireless interface data.
 pub struct NetworkBlock {
@@ -18,6 +19,7 @@ pub struct NetworkBlock {
     vpn_icons: Vec<char>,
     disconnected_icon: char,
     disabled_icon: char,
+    unknown_icon: char,
 
     next_update_time: DateTime<Local>,
 }
@@ -52,8 +54,9 @@ impl Default for NetworkBlock {
                 '\u{F0927}',
                 '\u{F092A}',
             ],
-            disconnected_icon: '\u{F092B}',
+            disconnected_icon: '\u{F092F}',
             disabled_icon: '\u{F092E}',
+            unknown_icon: '\u{F092B}',
 
             next_update_time: Local::now(),
         }
@@ -72,16 +75,8 @@ impl NetworkBlock {
     }
 
     fn packet_loss(&self) -> Result<bool, UpdateError> {
-        let mut ping_cmd = std::process::Command::new("ping");
-        ping_cmd.args(&[
-            "-c",
-            "2",
-            "-W",
-            "2",
-            "-I",
-            &self.iface_name,
-            "8.8.8.8",
-        ]);
+        let mut ping_cmd = Command::new("ping");
+        ping_cmd.args(&["-c", "2", "-W", "2", "-I", &self.iface_name, "8.8.8.8"]);
 
         let status = ping_cmd.status().map_err(|e| UpdateError {
             block_name: self.name().to_string(),
@@ -94,7 +89,8 @@ impl NetworkBlock {
     fn get_icon(&self) -> char {
         match &self.status {
             NetworkStatus::Disconnected => self.disconnected_icon,
-            NetworkStatus::Airplane => self.disabled_icon,
+            NetworkStatus::Disabled => self.disabled_icon,
+            NetworkStatus::Unknown => self.unknown_icon,
             _ => {
                 // determine which icons we'll use based on
                 // packet_loss
@@ -115,6 +111,70 @@ impl NetworkBlock {
             }
         }
     }
+
+    fn get_ip_link_show(&self) -> Result<String, UpdateError> {
+        let mut cmd = Command::new("ip");
+        cmd.args(&["link", "show", &self.iface_name]);
+        let stdout = cmd.output().map(|o| o.stdout).map_err(|e| UpdateError {
+            block_name: self.name().to_string(),
+            message: format!("there was a problem executing `ip`: {}", e),
+        })?;
+        Ok(String::from_utf8_lossy(&stdout).into_owned())
+    }
+
+    fn update_status(&mut self) -> Result<(), UpdateError> {
+        let ip_output = self.get_ip_link_show()?;
+        self.status = if ip_output.contains("state UP") {
+            NetworkStatus::Connected
+        } else if ip_output.contains("state DOWN") {
+            if ip_output.contains("NO-CARRIER") {
+                NetworkStatus::Disconnected
+            } else {
+                NetworkStatus::Disabled
+            }
+        } else if ip_output.contains("state DORMANT") {
+            NetworkStatus::Connecting
+        } else {
+            NetworkStatus::Unknown
+        };
+
+        Ok(())
+    }
+
+    fn update_ssid_strength(&mut self) -> Result<(), UpdateError> {
+        // get interface
+        let iface = get_interface(&self.iface_name).map_err(|e| {
+            self.status = NetworkStatus::Unknown;
+
+            UpdateError {
+                block_name: self.name().to_string(),
+                message: format!("couldn't get interface: {}", e),
+            }
+        })?;
+
+        // get station
+        let station = iface.get_station_info().map_err(|e| UpdateError {
+            block_name: self.name().to_string(),
+            message: format!("{}", e),
+        })?;
+
+        // get ssid
+        self.ssid = iface.ssid.map(|ssid| nl80211::parse_string(&ssid));
+        if self.ssid.is_none() {
+            self.status = NetworkStatus::Disconnected;
+        } else {
+            // get signal strength
+            if let Some(s) = station.signal {
+                let dbm = nl80211::parse_i8(&s);
+                self.strength_percent = dbm_to_percentage(dbm as i32);
+                self.status = NetworkStatus::Connected;
+            } else {
+                // if no signal, disconnected maybe?
+                self.status = NetworkStatus::Disconnected;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Block for NetworkBlock {
@@ -128,46 +188,39 @@ impl Block for NetworkBlock {
         self.next_update_time =
             chrono::Local::now() + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS);
 
-        // get interface
-        let iface = get_interface(&self.iface_name).map_err(|e| UpdateError {
-            block_name: self.name().to_string(),
-            message: format!("couldn't get interface: {}", e),
-        })?;
+        self.update_status()?;
 
-        // get station
-        let station = iface.get_station_info().map_err(|e| UpdateError {
-            block_name: self.name().to_string(),
-            message: format!("{}", e),
-        })?;
+        match self.status {
+            NetworkStatus::Connected | NetworkStatus::Unknown => {
+                // update ssid and strength to confirm connected status. if status at this point is
+                // Unknown, this might correct it
+                self.update_ssid_strength()?;
 
-        // get ssid
-        self.ssid = iface.ssid.map(|ssid| nl80211::parse_string(&ssid));
-
-        // get signal strength
-        if let Some(s) = station.signal {
-            let dbm = nl80211::parse_i8(&s);
-            self.strength_percent = dbm_to_percentage(dbm as i32);
-            self.status = NetworkStatus::Connected;
-        } else {
-            // if no signal, disconnected maybe?
-            self.status = NetworkStatus::Disconnected;
-        }
-
-        // detect packet loss
-        match self.packet_loss() {
-            Ok(p) => {
-                if p {
-                    self.status = NetworkStatus::PacketLoss;
-                } else {
-                    self.status = NetworkStatus::Connected;
+                // detect packet loss
+                match self.packet_loss() {
+                    Ok(p) => {
+                        if p {
+                            self.status = NetworkStatus::PacketLoss;
+                        } else {
+                            self.status = NetworkStatus::Connected;
+                        }
+                    }
+                    Err(e) => {
+                        // This is probably an error returned by `ping`, which is why we set the status
+                        // to PacketLoss here
+                        self.status = NetworkStatus::PacketLoss;
+                        return Err(e)
+                    }
                 }
-                Ok(())
             }
-            Err(e) => {
-                self.status = NetworkStatus::PacketLoss;
-                Err(e)
+            NetworkStatus::Disconnected | NetworkStatus::Disabled => {
+                // ensure that the ssid is set to None if we're disconnected or disabled
+                self.ssid = None;
             }
-        }
+            _ => {}
+        } 
+
+        Ok(())
     }
 
     fn next_update_time(&self) -> Option<DateTime<Local>> {
@@ -175,11 +228,20 @@ impl Block for NetworkBlock {
     }
 
     fn output(&self) -> Option<BlockOutputContent> {
+        let icon = self.get_icon();
         match &self.status {
+            NetworkStatus::Disconnected | NetworkStatus::Unknown | NetworkStatus::Disabled => {
+                Some(BlockOutputContent::from(NiceOutput {
+                    attention: Attention::Dim,
+                    icon,
+                    primary_text: self.status.to_string().unwrap_or_else(|| "".to_string()),
+                    secondary_text: None,
+                }))
+            }
             NetworkStatus::Connected | NetworkStatus::PacketLoss => {
                 Some(BlockOutputContent::from(NiceOutput {
                     attention: Attention::Normal,
-                    icon: self.get_icon(),
+                    icon,
                     primary_text: self.ssid.clone().unwrap_or_else(String::new),
                     secondary_text: self.status.to_string(),
                 }))
@@ -204,9 +266,9 @@ fn get_interface(interface_name: &str) -> Result<nl80211::Interface, BasicError>
         Err(e) => {
             return Err(BasicError {
                 message: format!(
-                    "couldn't create network block (connecting to netlink socket): {}",
-                    e
-                ),
+                             "couldn't create network block (connecting to netlink socket): {}",
+                             e
+                         ),
             })
         }
     };
@@ -257,13 +319,16 @@ pub enum NetworkStatus {
     SignInRequired,
 
     /// Wireless interfaces are disabled.
-    Airplane,
+    Disabled,
 
     /// The connection speed is slow.
     Slow,
 
     /// The connection signal strength is weak.
     Weak,
+
+    /// The status of the device is unknown.
+    Unknown,
 }
 
 impl NetworkStatus {
@@ -274,10 +339,11 @@ impl NetworkStatus {
             Self::Connecting => Some(String::from("Connecting")),
             Self::Connected => None,
             Self::SignInRequired => Some(String::from("Sign-in required")),
-            Self::Airplane => Some(String::from("Airplane mode")),
-            Self::Slow => Some(String::from("Slow connection")),
-            Self::Weak => Some(String::from("Weak connection")),
+            Self::Disabled => Some(String::from("Off")),
+            Self::Slow => Some(String::from("Slow")),
+            Self::Weak => Some(String::from("Weak")),
             Self::Vpn => Some(String::from("Secured")),
+            Self::Unknown => Some(String::from("Status unknown")),
         }
     }
 }
