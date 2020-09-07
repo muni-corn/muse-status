@@ -220,9 +220,28 @@ impl WeatherBlock {
 
 impl Block for WeatherBlock {
     fn update(&mut self) -> Result<(), UpdateError> {
+        let mut wait_time_seconds = 1;
+
+        // continually try to update with exponential falloff until we have a successful update
+        loop {
+            if let Err(e) = self.update_current_report() {
+                eprintln!("couldn't update weather: {}. trying again in {} seconds", e, wait_time_seconds)
+            } else {
+                break
+            }
+
+            std::thread::sleep(std::time::Duration::from_secs(wait_time_seconds));
+
+            if wait_time_seconds < self.update_interval_minutes as u64 * 60 {
+                wait_time_seconds *= 2;
+                if wait_time_seconds > self.update_interval_minutes as u64 * 60 {
+                    wait_time_seconds = self.update_interval_minutes as u64 * 60;
+                }
+            }
+        }
+
         self.next_update_time =
             Local::now() + chrono::Duration::minutes(self.update_interval_minutes as i64);
-        self.update_current_report()?;
 
         Ok(())
     }
