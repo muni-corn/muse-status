@@ -56,25 +56,35 @@ impl MprisBlock {
         };
 
         self.artist = if let Some(av) = metadata.album_artists() {
-            Some(av[0].clone())
+            Some(av[0].to_string())
         } else {
             None
         };
     }
 
-    fn main_loop(
+    fn main_iteration(
         mutex: Arc<Mutex<Box<Self>>>,
         block_sender: Sender<BlockOutput>,
     ) -> Result<(), MuseStatusError> {
-        let player = loop {
-            thread::sleep(std::time::Duration::from_secs(5));
-
+        let players = loop {
             if let Ok(player_finder) = mpris_lib::PlayerFinder::new() {
-                if let Ok(player) = player_finder.find_active() {
-                    break player;
+                if let Ok(players) = player_finder.find_all() {
+                    // ensure that there's at least one player we can use
+                    if !players.is_empty() {
+                        break players;
+                    }
                 }
             }
+
+            thread::sleep(std::time::Duration::from_secs(5));
         };
+
+        assert!(players.first().is_some());
+        let player = players.iter().find(|p| if let Ok(status) = p.get_playback_status() {
+            status == mpris::PlaybackStatus::Playing
+        } else {
+            false
+        }).unwrap_or_else(|| players.first().unwrap());
 
         {
             let mut block = mutex.lock().unwrap();
@@ -86,24 +96,28 @@ impl MprisBlock {
             block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
         }
 
-        if let Ok(mut events) = player.events() {
-            while let Some(Ok(e)) = events.next() {
-                // update the player data, then send the update
-                let mut block = mutex.lock().unwrap();
+        match player.events() {
+            Ok(mut events) => {
+                while let Some(Ok(e)) = events.next() {
+                    // update the player data, then send the update
+                    let mut block = mutex.lock().unwrap();
 
-                match e {
-                    // update the block depending on the Event
-                    mpris_lib::Event::Playing => block.status = PlayerStatus::Playing,
-                    mpris_lib::Event::Paused => block.status = PlayerStatus::Paused,
-                    mpris_lib::Event::Stopped | mpris_lib::Event::PlayerShutDown => {
-                        block.status = PlayerStatus::Stopped
+                    match e {
+                        // update the block depending on the Event
+                        mpris_lib::Event::Playing => block.status = PlayerStatus::Playing,
+                        mpris_lib::Event::Paused => block.status = PlayerStatus::Paused,
+                        mpris_lib::Event::Stopped | mpris_lib::Event::PlayerShutDown => {
+                            block.status = PlayerStatus::Stopped
+                        }
+                        mpris_lib::Event::TrackChanged(m) => block.set_metadata(m),
+                        _ => (),
                     }
-                    mpris_lib::Event::TrackChanged(m) => block.set_metadata(m),
-                    _ => (),
-                }
 
-                block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
-            }
+                    block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
+                }
+            },
+            Err(e) => eprintln!("error getting player events: {}", e)
+
         }
 
         {
@@ -129,9 +143,12 @@ impl Block for MprisBlock {
         let player_listen_handle = thread::Builder::new()
             .name(String::from("mpris player listener"))
             .spawn(move || loop {
-                let _ = Self::main_loop(mutex.clone(), block_sender.clone());
+                let _ = Self::main_iteration(mutex.clone(), block_sender.clone());
+
+                // sleep after every iteration to prevent spamming
+                thread::sleep(std::time::Duration::from_secs(5));
             })
-            .unwrap();
+        .unwrap();
 
         (vec![player_listen_handle], notify_tx)
     }
@@ -141,7 +158,7 @@ impl Block for MprisBlock {
     }
 
     fn name(&self) -> &str {
-        "playerctl"
+        "mpris"
     }
 
     fn next_update_time(&self) -> Option<chrono::DateTime<chrono::Local>> {
