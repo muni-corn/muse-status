@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use super::color::Color;
 use super::{Formatter, Mode};
 use serde::{Deserialize, Serialize};
@@ -28,6 +30,7 @@ impl Bit {
 
     /// Formats the Bit as a pango string.
     pub fn as_pango_string(&self, f: &Formatter) -> String {
+        let escaped = xml_escape(&self.text);
         match &self.color {
             Some(c) => {
                 let rgba = f.color_to_rgba(&c);
@@ -36,19 +39,23 @@ impl Bit {
                         r##"<span color='#{}' font_desc='{}'>{}</span>"##,
                         rgba.hex_string(Mode::JsonProtocol),
                         f,
-                        self.text
+                        escaped
                     ), // color and font
                     None => format!(
                         r##"<span color='#{}'>{}</span>"##,
                         rgba.hex_string(Mode::JsonProtocol),
-                        self.text
+                        escaped
                     ), // color, but no font
                 }
             }
             None => match &self.font {
-                Some(f) => format!(r##"<span font_desc='{}'>{}</span>"##, f, self.text), // font, but no color
-                None => self.text.clone(), // no color and no font
+                Some(f) => format!(r##"<span font_desc='{}'>{}</span>"##, f, escaped), // font, but no color
+                None => escaped.to_string(), // no color and no font
             },
         }
     }
+}
+
+fn xml_escape(s: &str) -> Cow<str> {
+    xml::escape::escape_str_attribute(s)
 }
