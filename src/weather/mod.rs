@@ -1,17 +1,21 @@
 mod structs;
 
-use crate::errors::*;
-use crate::format::blocks::output::*;
-use crate::format::blocks::Block;
-use crate::format::Attention;
+use crate::{
+    config::WeatherConfig,
+    errors::*,
+    format::{
+        blocks::{output::*, Block},
+        Attention,
+    },
+};
 use chrono::Local;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use structs::*;
 use std::fmt;
+use structs::*;
 
-const IP_STACK_KEY: &str = "9c237911bdacce2e8c9a021d9b4c1317";
-
-enum Units {
+#[derive(Deserialize, Serialize)]
+pub enum Units {
     Imperial,
     Metric,
 }
@@ -29,78 +33,58 @@ impl fmt::Display for Units {
 /// OpenWeatherMap and IPStack are used for weather and location respectively.
 pub struct WeatherBlock {
     openweathermap_key: String,
+    ipstack_key: String,
+    weather_icons: HashMap<String, char>,
+    default_icon: char,
+
     current_report: Option<FullWeatherReport>,
     location: Option<WeatherLocation>,
     units: Units,
 
-    update_interval_minutes: i32,
-
-    weather_icons: HashMap<String, char>,
-    default_icon: char,
+    update_interval_minutes: u32,
 
     next_update_time: chrono::DateTime<chrono::Local>,
 }
 
 impl Default for WeatherBlock {
     fn default() -> Self {
-        let mut weather_icons = HashMap::<String, char>::new();
-        weather_icons.insert(String::from("01d"), '\u{F0599}');
-        weather_icons.insert(String::from("01n"), '\u{F0594}');
-        weather_icons.insert(String::from("02d"), '\u{F0595}');
-        weather_icons.insert(String::from("02n"), '\u{F0F31}');
-        weather_icons.insert(String::from("03d"), '\u{F0590}');
-        weather_icons.insert(String::from("03n"), '\u{F0590}');
-        weather_icons.insert(String::from("04d"), '\u{F0590}');
-        weather_icons.insert(String::from("04n"), '\u{F0590}');
-        weather_icons.insert(String::from("09d"), '\u{F0597}');
-        weather_icons.insert(String::from("09n"), '\u{F0597}');
-        weather_icons.insert(String::from("10d"), '\u{F0596}');
-        weather_icons.insert(String::from("10n"), '\u{F0596}');
-        weather_icons.insert(String::from("11d"), '\u{F0593}');
-        weather_icons.insert(String::from("11n"), '\u{F0593}');
-        weather_icons.insert(String::from("13d"), '\u{F0598}');
-        weather_icons.insert(String::from("13n"), '\u{F0598}');
-        weather_icons.insert(String::from("50d"), '\u{F0591}');
-        weather_icons.insert(String::from("50n"), '\u{F0591}');
-
-        let default_icon = '\u{F0590}';
-        let openweathermap_key = "d179cc80ed41e8080f9e86356b604ee3"; // TODO: users should supply their own key
-        let units = Units::Imperial;
-
-        Self {
-            current_report: None,
-            location: None,
-            weather_icons,
-            default_icon,
-            openweathermap_key: openweathermap_key.to_string(),
-            update_interval_minutes: 20,
-            units,
-            next_update_time: Local::now() + chrono::Duration::minutes(20),
-        }
+        Self::new(WeatherConfig::default())
     }
 }
 
 impl WeatherBlock {
     /// Creates a new weather block.
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(config: WeatherConfig) -> Self {
+        Self {
+            openweathermap_key: config.openweathermap_key,
+            ipstack_key: config.ipstack_key,
+            weather_icons: config.weather_icons,
+            update_interval_minutes: config.update_interval_minutes,
+            default_icon: config.default_icon,
+            units: config.units,
+
+            current_report: None,
+            location: None,
+            next_update_time: Local::now()
+                + chrono::Duration::minutes(config.update_interval_minutes as i64),
+        }
     }
 
     /// Creates a new weather block, but with a custom location.
-    pub fn new_with_location(location: WeatherLocation) -> Self {
-        let mut w = Self::new();
+    pub fn new_with_location(config: WeatherConfig, location: WeatherLocation) -> Self {
+        let mut w = Self::new(config);
         w.current_report = None;
         w.location = Some(location);
 
         w
     }
 
-    fn get_current_location() -> Result<WeatherLocation, MuseStatusError> {
+    fn get_current_location(&self) -> Result<WeatherLocation, MuseStatusError> {
         let ip = get_external_ip()?;
 
         let url = format!(
             "http://api.ipstack.com/{}?access_key={}&format=1",
-            ip, IP_STACK_KEY
+            ip, self.ipstack_key
         );
 
         let res = reqwest::blocking::get(&url)?;
@@ -108,7 +92,7 @@ impl WeatherBlock {
         match serde_json::from_str::<WeatherLocation>(&res.text()?) {
             Ok(r) => Ok(r),
             Err(e) => Err(MuseStatusError::from(BasicError {
-                message: format!("could deserialize current location from ipstack: {}", e),
+                message: format!("couldn't deserialize current location from ipstack: {}", e),
             })),
         }
     }
@@ -124,15 +108,11 @@ impl WeatherBlock {
 
     fn update_current_report(&mut self) -> Result<(), UpdateError> {
         if self.location.is_none() {
-            self.location = match Self::get_current_location() {
-                Ok(l) => Some(l),
-                Err(e) => {
-                    return Err(UpdateError {
-                        block_name: self.name().to_owned(),
-                        message: format!("couldn't get current location: {}", e),
-                    })
-                }
-            };
+            let location = self.get_current_location().map_err(|e| UpdateError {
+                block_name: self.name().to_owned(),
+                message: format!("couldn't get current location: {}", e),
+            })?;
+            self.location = Some(location);
         }
 
         self.current_report = match &self.location {
@@ -225,18 +205,19 @@ impl Block for WeatherBlock {
         // continually try to update with exponential falloff until we have a successful update
         loop {
             if let Err(e) = self.update_current_report() {
-                eprintln!("couldn't update weather: {}. trying again in {} seconds", e, wait_time_seconds)
+                eprintln!(
+                    "couldn't update weather: {}. trying again in {} seconds",
+                    e, wait_time_seconds
+                )
             } else {
-                break
+                break;
             }
 
             std::thread::sleep(std::time::Duration::from_secs(wait_time_seconds));
 
             if wait_time_seconds < self.update_interval_minutes as u64 * 60 {
-                wait_time_seconds *= 2;
-                if wait_time_seconds > self.update_interval_minutes as u64 * 60 {
-                    wait_time_seconds = self.update_interval_minutes as u64 * 60;
-                }
+                wait_time_seconds =
+                    (wait_time_seconds * 2).min(self.update_interval_minutes as u64 * 60);
             }
         }
 
@@ -255,7 +236,9 @@ impl Block for WeatherBlock {
             Some(BlockOutputContent::from(NiceOutput {
                 attention: Attention::Normal,
                 icon: self.get_weather_icon(r),
-                primary_text: self.get_temperature_string().unwrap_or_else(|| "".to_string()),
+                primary_text: self
+                    .get_temperature_string()
+                    .unwrap_or_else(|| "".to_string()),
                 secondary_text: self.get_weather_description(),
             }))
         } else {
