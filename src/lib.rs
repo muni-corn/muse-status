@@ -13,6 +13,9 @@ pub mod brightness;
 /// The client module, used by the muse-status executable.
 pub mod client;
 
+/// The config module, for user config.
+pub mod config;
+
 /// The daemon module, used by the muse-status-daemon executable.
 pub mod daemon;
 

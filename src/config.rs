@@ -1,18 +1,33 @@
+use crate::{battery::BatteryLevel, errors::BasicError, errors::MuseStatusError, weather::Units};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use crate::{battery::BatteryLevel, weather::Units};
+use std::{collections::HashMap, path::Path, path::PathBuf};
 
+/// Configuration for all of muse-status.
 #[derive(Deserialize, Serialize)]
 #[serde(default)]
 pub struct Config {
+    /// The TCP address to run and listen on.
     pub daemon_addr: String,
+
+    /// The ordering of primary-level blocks.
     pub primary_order: Vec<String>,
+
+    /// The ordering of secondary-level blocks.
     pub secondary_order: Vec<String>,
+
+    /// The ordering of tertiary-level blocks.
     pub tertiary_order: Vec<String>,
 
+    /// The name of the brightness directory in Linux's /sys/class/backlight directory.
     pub brightness_id: Option<String>,
+
+    /// The name of the user's network interface (like `wlan0`).
     pub network_interface_name: Option<String>,
+
+    /// Battery config to use for battery blocks.
     pub battery_config: Option<BatteryConfig>,
+
+    /// Weather config to use for weather blocks.
     pub weather_config: Option<WeatherConfig>,
 }
 
@@ -41,10 +56,28 @@ impl Default for Config {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+impl Config {
+    /// Parses the configuration file at the path.
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Config, MuseStatusError> {
+        serde_yaml::from_reader(std::fs::File::open(path)?).map_err(|e| {
+            MuseStatusError::Basic(BasicError {
+                message: format!("couldn't parse the configuration file: {}", e),
+            })
+        })
+    }
+}
+
+/// Configuration for a battery information struct.
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct BatteryConfig {
+    /// The name of the battery in Linux's /sys/class/power_supply/ directory.
     pub battery_id: String,
+
+    /// The level at which the battery is getting low.
     pub warning_level: BatteryLevel,
+
+    /// The level at which the battery is considered critically low.
     pub alarm_level: BatteryLevel,
 }
 
@@ -58,20 +91,33 @@ impl Default for BatteryConfig {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+/// Configuration for a weather information block.
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct WeatherConfig {
+    /// API key for OpenWeatherMap, which, ya know, gets weather information.
     pub openweathermap_key: String,
+
+    /// API key for IPStack, which returns a geolocation from a user's public IP.
     pub ipstack_key: String,
+
+    /// Weather icons.
     pub weather_icons: HashMap<String, char>,
+
+    /// The default icon to use if a weather icon isn't available.
     pub default_icon: char,
+
+    /// How often to update weather, in minutes.
     pub update_interval_minutes: u32,
+
+    /// The units to report weather in, either Imperial or Metric.
     pub units: Units,
 }
 
 impl Default for WeatherConfig {
     fn default() -> Self {
-        let mut weather_icons = {
-            let hm = HashMap::<String, char>::new();
+        let weather_icons = {
+            let mut hm = HashMap::<String, char>::new();
             hm.insert(String::from("01d"), '\u{F0599}');
             hm.insert(String::from("01n"), '\u{F0594}');
             hm.insert(String::from("02d"), '\u{F0595}');
@@ -107,5 +153,16 @@ impl Default for WeatherConfig {
             // masses
             units: Units::Metric,
         }
+    }
+}
+
+/// Returns the default configuration path for muse-status.
+pub fn default_config_path() -> Result<PathBuf, MuseStatusError> {
+    if let Some(dir) = dirs::config_dir() {
+        Ok(dir.join("muse-status").join("daemon.yaml"))
+    } else {
+        Err(MuseStatusError::Basic(BasicError {
+            message: String::from("couldn't figure out your configuration path.\ntry using the `--config` flag instead")
+        }))
     }
 }

@@ -1,11 +1,16 @@
-use crate::daemon::{Collection, DaemonMsg, DataPayload};
-use crate::errors::MuseStatusError;
-use crate::format::blocks::BlockOutput;
-use crate::format::Formatter;
+use crate::{
+    config::{self, Config},
+    daemon::{Collection, DaemonMsg, DataPayload},
+    errors::MuseStatusError,
+    format::{blocks::BlockOutput, Formatter},
+};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
-use std::net::TcpStream;
+use std::{
+    collections::HashMap,
+    io::{BufRead, BufReader, Write},
+    net::TcpStream,
+    path::PathBuf,
+};
 
 /// A Client that connects to the Daemon and receives data.
 pub struct Client {
@@ -44,8 +49,10 @@ impl Client {
             println!("sending action to daemon: {:?}", self.args.client_msg);
 
             // for anything else, we'll need a connection to the daemon.
-            let mut stream = get_daemon_connection();
-            stream.write_all(format!("{}\n", serde_json::to_string(&self.args.client_msg)?).as_bytes())?;
+            let mut stream = get_daemon_connection(&self.args.config.daemon_addr);
+            stream.write_all(
+                format!("{}\n", serde_json::to_string(&self.args.client_msg)?).as_bytes(),
+            )?;
 
             // if Subscribe, handle the subscription. if Update, send request and quit.
             // self.args.client_msg is cloned in the case that we handle a subscription and `self` must be
@@ -112,22 +119,20 @@ impl Client {
             }
 
             // if the connection to the daemon is lost, restore it
-            daemon_conn = get_daemon_connection();
+            daemon_conn = get_daemon_connection(&self.args.config.daemon_addr);
         }
     }
 
     /// Prints formatted output.
     fn echo_output(&self, collection: &Collection, f: &Formatter) {
+        let config = &self.args.config;
         let data = match collection {
-            Collection::All => DataPayload::ranked(&self.data),
-            Collection::Primary => DataPayload::only_primary(&self.data),
-            Collection::Secondary => DataPayload::only_secondary(&self.data),
-            Collection::Tertiary => DataPayload::only_tertiary(&self.data),
+            Collection::All => DataPayload::ranked(config, &self.data),
+            Collection::Primary => DataPayload::only_primary(config, &self.data),
+            Collection::Secondary => DataPayload::only_secondary(config, &self.data),
+            Collection::Tertiary => DataPayload::only_tertiary(config, &self.data),
             Collection::One(b) => DataPayload::from_one(b, &self.data),
-            Collection::Many(n) => DataPayload::from_many(
-                &n.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
-                &self.data,
-            ),
+            Collection::Many(n) => DataPayload::from_many(&n, &self.data),
         };
 
         println!("{}", f.format_data(data));
@@ -141,9 +146,9 @@ impl Client {
 }
 
 /// Polls for a connection to the daemon.
-fn get_daemon_connection() -> TcpStream {
+fn get_daemon_connection(addr: &str) -> TcpStream {
     loop {
-        if let Ok(s) = TcpStream::connect("localhost:1612") {
+        if let Ok(s) = TcpStream::connect(addr) {
             return s;
         }
 
@@ -175,6 +180,7 @@ struct ClientArgs {
     client_msg: ClientMsg,
     force: bool,
     formatter: Formatter,
+    config: Config,
 }
 
 impl ClientArgs {
@@ -192,11 +198,16 @@ impl ClientArgs {
         // default values
         let mut msg_type = ClientMsgType::Subscribe;
         let mut collection = Collection::All;
+        let mut config_path = None;
 
         let mut args = std::env::args();
 
+        // parse args
         while let Some(arg) = args.next() {
-            let mut extract_next_value = || args.next().ok_or_else(|| MuseStatusError::from(format!("`{}` requires a value", arg)));
+            let mut extract_next_value = || {
+                args.next()
+                    .ok_or_else(|| MuseStatusError::from(format!("`{}` requires a value", arg)))
+            };
 
             match arg.as_str() {
                 "sub" | "subscribe" => msg_type = ClientMsgType::Subscribe,
@@ -206,11 +217,18 @@ impl ClientArgs {
                 "t" | "tertiary" => collection = Collection::Tertiary,
                 "a" | "all" => collection = Collection::All,
 
-                "-p" | "--primary-color" => result.formatter.set_primary_color(&extract_next_value()?)?,
-                "-s" | "--secondary-color" => result.formatter.set_secondary_color(&extract_next_value()?)?,
+                "-p" | "--primary-color" => {
+                    result.formatter.set_primary_color(&extract_next_value()?)?
+                }
+                "-s" | "--secondary-color" => result
+                    .formatter
+                    .set_secondary_color(&extract_next_value()?)?,
                 "-i" | "--icon-font" => result.formatter.set_icon_font(&extract_next_value()?),
-                "-m" | "--mode" => result.formatter.set_format_mode(extract_next_value()?.parse()?),
+                "-m" | "--mode" => result
+                    .formatter
+                    .set_format_mode(extract_next_value()?.parse()?),
                 "-f" | "--force" => result.force = true,
+                "-c" | "--config" => config_path = Some(PathBuf::from(extract_next_value()?)),
                 _ => {
                     if arg.starts_with('-') {
                         eprintln!("heads up: `{}` is not a flag muse-status recognizes, but we'll go on anyways", arg)
@@ -218,17 +236,31 @@ impl ClientArgs {
                         match collection {
                             Collection::One(o) => collection = Collection::Many(vec![o, arg]),
                             Collection::Many(ref mut m) => m.push(arg),
-                            _ => collection = Collection::One(arg)
+                            _ => collection = Collection::One(arg),
                         }
                     }
-                },
+                }
             }
         }
+
+        // if no config path was passed in, try getting the default one
+        let config = if let Some(path) = config_path {
+            Config::from_file(path)?
+        } else {
+            let path = config::default_config_path()?;
+            if path.exists() {
+                Config::from_file(path)?
+            } else {
+                Config::default()
+            }
+        };
 
         result.client_msg = match msg_type {
             ClientMsgType::Subscribe => ClientMsg::Subscribe(collection),
             ClientMsgType::Update => ClientMsg::Update(collection),
         };
+
+        result.config = config;
 
         Ok(result)
     }
