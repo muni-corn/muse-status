@@ -1,20 +1,34 @@
-use muse_status::battery;
-use muse_status::brightness;
-use muse_status::daemon::Daemon;
-use muse_status::date;
-use muse_status::format::blocks::Block;
-use muse_status::mpris;
-use muse_status::network;
-use muse_status::volume;
-use muse_status::weather;
+use muse_status::{
+    battery, brightness, config, daemon::Daemon, date, format::blocks::Block, mpris, network,
+    volume, weather,
+};
 
 fn main() {
-    if std::env::args().count() > 1 {
-        println!("muse-status-daemon doesn't need any arguments, but it was nice of you to provide some :)");
+    let mut env_args = std::env::args();
+    let mut config_path = None;
+    while let Some(arg) = env_args.next() {
+        if arg == "--config" || arg == "-c" {
+            config_path = Some(
+                env_args
+                    .next()
+                    .unwrap_or_else(|| panic!("`{}` requires a value", arg)),
+            );
+        }
     }
 
-    // TODO parse from configuration file
-    let battery_block = battery::SmartBatteryBlock::new("BAT0", 30, 15);
+    let config = if let Some(path) = config_path {
+        config::Config::from_file(path).unwrap()
+    } else {
+        let path = config::default_config_path().unwrap();
+        if path.exists() {
+            config::Config::from_file(path).unwrap()
+        } else {
+            config::Config::default()
+        }
+    };
+
+    let battery_block =
+        battery::SmartBatteryBlock::new(config.battery_config.clone().unwrap_or_default());
     let brightness_block = brightness::BrightnessBlock::new("amdgpu_bl0");
     let date_block = date::DateBlock::new();
     let network_block = match network::NetworkBlock::new("wlan0") {
@@ -26,7 +40,8 @@ fn main() {
     };
     let mpris_block = mpris::MprisBlock::new();
     let volume_block = volume::VolumeBlock::new();
-    let weather_block = weather::WeatherBlock::new();
+    let weather_block =
+        weather::WeatherBlock::new(config.weather_config.clone().unwrap_or_default());
 
     let blocks: Vec<Box<dyn Block>> = vec![
         Box::new(date_block),
@@ -38,7 +53,7 @@ fn main() {
         Box::new(battery_block),
     ];
 
-    let daemon = Daemon::new("localhost:1612");
+    let daemon = Daemon::new(config);
     match daemon.start(blocks) {
         Ok(j) => {
             println!("the daemon is running");
