@@ -28,7 +28,7 @@ fn main() {
     };
 
     let battery_block =
-        battery::SmartBatteryBlock::new(config.battery_config.clone().unwrap_or_default());
+        battery::BatteryBlock::new(config.battery_config.clone().unwrap_or_default());
     let brightness_block = brightness::BrightnessBlock::new("amdgpu_bl0");
     let date_block = date::DateBlock::new();
     let network_block = match network::NetworkBlock::new("wlan0") {
