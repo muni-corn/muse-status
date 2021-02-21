@@ -1,19 +1,26 @@
-use crate::client::ClientMsg;
-use crate::errors::*;
-use crate::format;
-use crate::format::blocks::output::BlockOutput;
-use crate::format::blocks::Block;
+use crate::{
+    client::ClientMsg,
+    config::Config,
+    errors::*,
+    format::{
+        self,
+        blocks::{output::BlockOutput, Block},
+    },
+};
+use retain_mut::RetainMut;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::BufRead;
-use std::io::Write;
-use std::net::{TcpListener, TcpStream};
-use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    mpsc::{self, Receiver, Sender},
+    Arc, Mutex,
+};
 use std::thread;
 use std::thread::JoinHandle;
-use retain_mut::RetainMut;
+use std::{
+    io::BufRead,
+    io::Write,
+    net::{TcpListener, TcpStream},
+};
 
 type BlockVec = Vec<Box<dyn Block>>;
 type BlockOutputs = HashMap<String, BlockOutput>;
@@ -21,11 +28,9 @@ type BlockOutputs = HashMap<String, BlockOutput>;
 /// A daemon for muse-status. The daemon handles the logic of blocks as a server. Any connected
 /// clients are sent the formatted status output.
 pub struct Daemon {
-    addr: String,
+    config: Config,
     subscribers: Vec<Subscriber>,
-
     update_request_senders: Vec<UpdateRequestSender>,
-
     block_outputs: BlockOutputs,
 }
 
@@ -33,13 +38,11 @@ type DaemonMutexArc = Arc<Mutex<Daemon>>;
 
 impl Daemon {
     /// Creates a new Daemon that runs at the specified address.
-    pub fn new(addr: &str) -> Self {
+    pub fn new(config: Config) -> Self {
         Daemon {
-            addr: addr.to_string(),
+            config,
             subscribers: Vec::new(),
-
             update_request_senders: Vec::new(),
-
             block_outputs: Default::default(),
         }
     }
@@ -52,7 +55,7 @@ impl Daemon {
         println!("the daemon has been started");
 
         // start listening on the daemon's address
-        let listener = TcpListener::bind(&self.addr)?;
+        let listener = TcpListener::bind(&self.config.daemon_addr)?;
 
         // get channels for block outputs and banners
         let (block_tx, block_rx) = mpsc::channel::<BlockOutput>();
@@ -157,7 +160,10 @@ impl Daemon {
 
         while let Ok(output) = block_rx.recv() {
             #[cfg(debug_assertions)]
-            println!("received block update from {}: {:?}", output.block_name, output.body);
+            println!(
+                "received block update from {}: {:?}",
+                output.block_name, output.body
+            );
 
             let mut daemon = daemon_arc.lock().unwrap();
             daemon
@@ -208,53 +214,66 @@ impl Daemon {
         let mut buf_reader = std::io::BufReader::new(conn.try_clone()?);
         let mut raw_action = String::new();
 
-        thread::Builder::new().name("single client handler".to_string()).spawn(move || {
-            buf_reader.read_line(&mut raw_action).unwrap();
+        thread::Builder::new()
+            .name("single client handler".to_string())
+            .spawn(move || {
+                buf_reader.read_line(&mut raw_action).unwrap();
 
-            let action = serde_json::from_str(raw_action.as_str()).unwrap();
+                let action = serde_json::from_str(raw_action.as_str()).unwrap();
 
-            #[cfg(debug_assertions)]
-            println!("handling message from new client: {:?}", action);
+                #[cfg(debug_assertions)]
+                println!("handling message from new client: {:?}", action);
 
-            let mut daemon = daemon_arc.lock().unwrap();
+                let mut daemon = daemon_arc.lock().unwrap();
 
-            match action {
-                ClientMsg::Subscribe(collection) => {
-                    daemon.subscribe_client(conn, collection).unwrap();
+                match action {
+                    ClientMsg::Subscribe(collection) => {
+                        daemon.subscribe_client(conn, collection).unwrap();
+                    }
+                    ClientMsg::Update(collection) => {
+                        #[cfg(debug_assertions)]
+                        println!("handling update request from client: {:?}", collection);
+
+                        daemon.update_collection(&collection);
+                    }
+                    ClientMsg::Noop => (), // literally do nothing
                 }
-                ClientMsg::Update(collection) => {
-                    #[cfg(debug_assertions)]
-                    println!("handling update request from client: {:?}", collection);
-
-                    daemon.update_collection(&collection);
-                }
-                ClientMsg::Noop => (), // literally do nothing
-            }
-        }).unwrap();
+            })
+            .unwrap();
 
         Ok(())
     }
 
     /// Sends data updates to subscribers.
-    fn send_output_update_to_all(&mut self, new_block_output: BlockOutput) -> Result<(), MuseStatusError> {
+    fn send_output_update_to_all(
+        &mut self,
+        new_block_output: BlockOutput,
+    ) -> Result<(), MuseStatusError> {
         #[cfg(debug_assertions)]
         println!("sending output to all subscribers: {:?}", new_block_output);
 
         let block_name = new_block_output.block_name.clone();
         let serialized_output = serde_json::to_string(&DaemonMsg::NewOutput(new_block_output))?;
+        let config = &self.config;
 
         // send updates, only retaining subscribers that were successfully sent updates
         self.subscribers.retain_mut(|sub| {
-            if is_block_name_in_collection(&block_name, sub.collection()) {
+            if is_block_name_in_collection(config, &block_name, sub.collection()) {
                 if let Err(e) = send_serialized_data(sub, &serialized_output) {
-                    eprintln!("there was an error ({}). the subscriber will be ignored from now on", e);
+                    eprintln!(
+                        "there was an error ({}). the subscriber will be ignored from now on",
+                        e
+                    );
                     false
                 } else {
                     true
                 }
             } else {
                 #[cfg(debug_assertions)]
-                println!("subscriber skipped when sending update: collection is {:?}", sub.collection());
+                println!(
+                    "subscriber skipped when sending update: collection is {:?}",
+                    sub.collection()
+                );
                 true
             }
         });
@@ -264,7 +283,11 @@ impl Daemon {
 
     /// Sends all data requested by the subscriber, usually to initialize it.
     fn force_send_data(&self, sub: &mut Subscriber) -> Result<(), MuseStatusError> {
-        let all_outputs = self.block_outputs.iter().map(|t| t.1.to_owned()).collect::<Vec<BlockOutput>>();
+        let all_outputs = self
+            .block_outputs
+            .iter()
+            .map(|t| t.1.to_owned())
+            .collect::<Vec<BlockOutput>>();
         let msg = DaemonMsg::AllData(all_outputs);
         send_serialized_data(sub, &serde_json::to_string(&msg)?)
     }
@@ -272,8 +295,9 @@ impl Daemon {
     fn update_collection(&mut self, collection: &Collection) {
         // get the iterator of requesters to use according to the collection
         let all_requesters = self.update_request_senders.iter_mut();
+        let config = &self.config;
         let requesters: Vec<&mut UpdateRequestSender> = all_requesters
-            .filter(|r| is_block_name_in_collection(&r.0, collection))
+            .filter(|r| is_block_name_in_collection(config, &r.0, collection))
             .collect();
 
         for requester in requesters {
@@ -309,10 +333,6 @@ impl UpdateRequestSender {
         self.1.send(())
     }
 }
-
-const PRIMARY_ORDER: &[&str] = &["date", "weather", "mpris"];
-const SECONDARY_ORDER: &[&str] = &["brightness", "volume", "network", "battery"];
-const TERTIARY_ORDER: &[&str] = &[""];
 
 /// An enum for specifying a section of blocks. Used for subscriptions and other commands.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -367,11 +387,11 @@ pub enum DataPayload {
 
 impl DataPayload {
     /// Creates a Ranked DataPayload out of the outputs provided.
-    pub fn ranked(outputs: &HashMap<String, BlockOutput>) -> Self {
+    pub fn ranked(config: &Config, outputs: &HashMap<String, BlockOutput>) -> Self {
         let (primary, secondary, tertiary) = (
-            Self::make_vec(PRIMARY_ORDER, outputs),
-            Self::make_vec(SECONDARY_ORDER, outputs),
-            Self::make_vec(TERTIARY_ORDER, outputs),
+            Self::make_vec(&config.primary_order, outputs),
+            Self::make_vec(&config.secondary_order, outputs),
+            Self::make_vec(&config.tertiary_order, outputs),
         );
 
         Self::Ranked {
@@ -382,8 +402,8 @@ impl DataPayload {
     }
 
     /// Creates a Ranked DataPayload out of the outputs provided, but only with primary blocks.
-    pub fn only_primary(outputs: &HashMap<String, BlockOutput>) -> Self {
-        let v = Self::make_vec(PRIMARY_ORDER, outputs);
+    pub fn only_primary(config: &Config, outputs: &HashMap<String, BlockOutput>) -> Self {
+        let v = Self::make_vec(&config.primary_order, outputs);
 
         Self::Ranked {
             primary: v,
@@ -393,8 +413,8 @@ impl DataPayload {
     }
 
     /// Creates a Ranked DataPayload out of the outputs provided, but only with secondary blocks.
-    pub fn only_secondary(outputs: &HashMap<String, BlockOutput>) -> Self {
-        let v = Self::make_vec(SECONDARY_ORDER, outputs);
+    pub fn only_secondary(config: &Config, outputs: &HashMap<String, BlockOutput>) -> Self {
+        let v = Self::make_vec(&config.secondary_order, outputs);
 
         Self::Ranked {
             primary: Default::default(),
@@ -404,8 +424,8 @@ impl DataPayload {
     }
 
     /// Creates a Ranked DataPayload out of the outputs provided, but only with tertiary blocks.
-    pub fn only_tertiary(outputs: &HashMap<String, BlockOutput>) -> Self {
-        let v = Self::make_vec(TERTIARY_ORDER, outputs);
+    pub fn only_tertiary(config: &Config, outputs: &HashMap<String, BlockOutput>) -> Self {
+        let v = Self::make_vec(&config.tertiary_order, outputs);
 
         Self::Ranked {
             primary: Default::default(),
@@ -415,20 +435,20 @@ impl DataPayload {
     }
 
     /// Creates an Unranked DataPayload out any arbitrary combination of blocks.
-    pub fn from_many(names: &[&str], outputs: &HashMap<String, BlockOutput>) -> Self {
+    pub fn from_many(names: &[String], outputs: &HashMap<String, BlockOutput>) -> Self {
         let v = Self::make_vec(names, outputs);
         Self::Unranked(v)
     }
 
     /// Creates an Unranked DataPayload out of exactly one arbitrary block.
     pub fn from_one(name: &str, outputs: &HashMap<String, BlockOutput>) -> Self {
-        Self::Unranked(Self::make_vec(&[name], outputs))
+        Self::Unranked(Self::make_vec(&[name.to_string()], outputs))
     }
 
-    fn make_vec(names: &[&str], outputs: &HashMap<String, BlockOutput>) -> Vec<BlockOutput> {
+    fn make_vec(names: &[String], outputs: &HashMap<String, BlockOutput>) -> Vec<BlockOutput> {
         let mut v = Vec::new();
         for name in names {
-            if let Some(o) = outputs.get(*name) {
+            if let Some(o) = outputs.get(name) {
                 v.push(o.clone());
             }
         }
@@ -437,12 +457,12 @@ impl DataPayload {
     }
 }
 
-fn is_block_name_in_collection(block_name: &str, collection: &Collection) -> bool {
+fn is_block_name_in_collection(config: &Config, block_name: &str, collection: &Collection) -> bool {
     match collection {
         Collection::All => true,
-        Collection::Primary => PRIMARY_ORDER.iter().any(|&n| n == block_name),
-        Collection::Secondary => SECONDARY_ORDER.iter().any(|&n| n == block_name),
-        Collection::Tertiary => TERTIARY_ORDER.iter().any(|&n| n == block_name),
+        Collection::Primary => config.primary_order.iter().any(|n| n == block_name),
+        Collection::Secondary => config.secondary_order.iter().any(|n| n == block_name),
+        Collection::Tertiary => config.tertiary_order.iter().any(|n| n == block_name),
         Collection::One(b) => b == block_name,
         Collection::Many(v) => v.iter().any(|n| n == block_name),
     }

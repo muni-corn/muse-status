@@ -14,9 +14,13 @@ use std::collections::HashMap;
 use std::fmt;
 use structs::*;
 
-#[derive(Deserialize, Serialize)]
+/// Type of units to use when reporting locale-specific measurements.
+#[derive(Clone, Copy, Deserialize, Serialize)]
 pub enum Units {
+    /// Freedom units.
     Imperial,
+
+    /// Non-US units.
     Metric,
 }
 
