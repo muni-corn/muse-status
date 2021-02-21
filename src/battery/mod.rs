@@ -1,8 +1,13 @@
-use crate::errors::*;
-use crate::format::blocks::output::*;
-use crate::format::blocks::*;
-use crate::format::Attention;
+use crate::{
+    config::BatteryConfig,
+    errors::*,
+    format::{
+        blocks::{output::*, *},
+        Attention,
+    },
+};
 use chrono::{DateTime, Duration, Local};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// The status of a battery.
@@ -45,13 +50,24 @@ struct BatteryRead {
     charge: i32,
 }
 
+/// A remaining battery level while a battery is discharging, whether measured by percentage or
+/// minutes until complete depletion.
+#[derive(Clone, Copy, Deserialize, Serialize, PartialOrd, PartialEq)]
+pub enum BatteryLevel {
+    /// A value from 0.0 to 1.0.
+    Percentage(f32),
+
+    /// Minutes until the battery is depleted.
+    MinutesLeft(i64),
+}
+
 const SYS_POWER_SUPPLY_BASE_DIR: &str = "/sys/class/power_supply/";
 const MAX_READS: i32 = 15; // used for moving averages
 
 /// Data block for battery reports and estimates
-pub struct SmartBatteryBlock {
-    warning_level: i32,
-    alarm_level: i32,
+pub struct BatteryBlock {
+    warning_level: BatteryLevel,
+    alarm_level: BatteryLevel,
 
     battery: String,
     charge_full: i32,
@@ -68,14 +84,14 @@ pub struct SmartBatteryBlock {
     next_update_time: DateTime<Local>,
 }
 
-impl SmartBatteryBlock {
-    /// Returns a new block with the specified battery, warning level, and alarm level..
-    pub fn new(battery_dir: &str, warning_level: i32, alarm_level: i32) -> Self {
-        let battery = String::from(battery_dir);
+impl BatteryBlock {
+    /// Returns a new block with the configuration provided.
+    pub fn new(config: BatteryConfig) -> Self {
+        let battery = String::from(config.battery_id);
         let next_update_time = Local::now() + Duration::minutes(1);
         Self {
-            warning_level,
-            alarm_level,
+            warning_level: config.warning_level,
+            alarm_level: config.alarm_level,
 
             battery,
             charge_full: 0,
@@ -173,11 +189,11 @@ impl SmartBatteryBlock {
         PathBuf::from(SYS_POWER_SUPPLY_BASE_DIR).join(&self.battery)
     }
 
-    fn get_completion_time(&self) -> Option<DateTime<Local>> {
+    /// Returns the amount of nanoseconds left until the battery will be either fully charged or
+    /// completely depleted.
+    fn get_nanos_left(&self) -> Option<i64> {
         match &self.current_read {
             Some(r) => {
-                let now = Local::now();
-
                 let end = match &r.status {
                     ChargeStatus::Discharging => 0,
                     ChargeStatus::Charging => self.charge_full,
@@ -192,15 +208,64 @@ impl SmartBatteryBlock {
                 };
 
                 let nanos_left = (end - r.charge) as f32 * rate;
-                let time_left = Duration::nanoseconds(nanos_left as i64); // charge units remaining * nanoseconds / charge unit
-                Some(now + time_left)
+                Some(nanos_left as i64)
             }
             None => None,
         }
     }
+
+    /// Returns the amount of minutes left until the battery will be either fully charged or
+    /// completely depleted.
+    fn get_minutes_left(&self) -> Option<i64> {
+        self.get_nanos_left()
+            .map(|n| Duration::nanoseconds(n).num_minutes())
+    }
+
+    /// Returns how full the battery is, a value ranging from 0 to 1.
+    fn get_percent_left(&self) -> Option<f32> {
+        self.current_read
+            .clone()
+            .map(|current_read| current_read.charge as f32 / self.charge_full as f32)
+    }
+
+    /// Returns the time at which the battery will be either fully charged or completely depleted.
+    fn get_completion_time(&self) -> Option<DateTime<Local>> {
+        self.get_nanos_left()
+            .map(|n| Local::now() + Duration::nanoseconds(n as i64))
+    }
+
+    /// Returns true if the battery is at or below the warning level. If no current battery reading
+    /// is saved, the method returns false.
+    fn is_warning(&self) -> bool {
+        match self.warning_level {
+            BatteryLevel::MinutesLeft(warning_minutes) => match self.get_minutes_left() {
+                Some(battery_minutes) => battery_minutes <= warning_minutes,
+                None => false,
+            },
+            BatteryLevel::Percentage(warning_percentage) => match self.get_percent_left() {
+                Some(battery_percentage) => battery_percentage <= warning_percentage,
+                None => false,
+            },
+        }
+    }
+
+    /// Returns true if the battery is at or below the alarm level. If no current battery reading
+    /// is saved, the method returns false.
+    fn is_alarm(&self) -> bool {
+        match self.alarm_level {
+            BatteryLevel::MinutesLeft(alarm_minutes) => match self.get_minutes_left() {
+                Some(battery_minutes) => battery_minutes <= alarm_minutes,
+                None => false,
+            },
+            BatteryLevel::Percentage(alarm_percentage) => match self.get_percent_left() {
+                Some(battery_percentage) => battery_percentage <= alarm_percentage,
+                None => false,
+            },
+        }
+    }
 }
 
-impl Block for SmartBatteryBlock {
+impl Block for BatteryBlock {
     fn name(&self) -> &str {
         "battery"
     }
@@ -209,7 +274,7 @@ impl Block for SmartBatteryBlock {
         match &self.current_read {
             Some(current_read) => {
                 let now = Local::now();
-                let percent = current_read.charge * 100 / self.charge_full;
+                let percent = (self.get_percent_left().unwrap() * 100.0) as i32;
 
                 let primary_text = match current_read.status {
                     ChargeStatus::Full => String::from("Full"),
@@ -251,9 +316,9 @@ impl Block for SmartBatteryBlock {
                 let attention = if let Some(r) = &self.current_read {
                     match &r.status {
                         ChargeStatus::Discharging => {
-                            if r.charge < self.alarm_level {
+                            if self.is_alarm() {
                                 Attention::AlarmPulse
-                            } else if r.charge < self.warning_level {
+                            } else if self.is_warning() {
                                 Attention::WarningPulse
                             } else {
                                 Attention::Normal
@@ -340,12 +405,30 @@ fn get_new_average_rate(avg_rate_now: f32, reads: i32, new_read_rate: f32) -> f3
 }
 
 const DISCHARGING_ICONS: [char; 11] = [
-    '\u{f008e}', '\u{f007a}', '\u{f007b}', '\u{f007c}', '\u{f007d}', '\u{f007e}', '\u{f007f}', '\u{f0080}',
-    '\u{f0081}', '\u{f0082}', '\u{f0079}',
+    '\u{f008e}',
+    '\u{f007a}',
+    '\u{f007b}',
+    '\u{f007c}',
+    '\u{f007d}',
+    '\u{f007e}',
+    '\u{f007f}',
+    '\u{f0080}',
+    '\u{f0081}',
+    '\u{f0082}',
+    '\u{f0079}',
 ];
 const CHARGING_ICONS: [char; 11] = [
-    '\u{f089f}', '\u{f089c}', '\u{f0086}', '\u{f0087}', '\u{f0088}', '\u{f089d}', '\u{f0089}', '\u{f089e}',
-    '\u{f008a}', '\u{f008b}', '\u{f0085}',
+    '\u{f089f}',
+    '\u{f089c}',
+    '\u{f0086}',
+    '\u{f0087}',
+    '\u{f0088}',
+    '\u{f089d}',
+    '\u{f0089}',
+    '\u{f089e}',
+    '\u{f008a}',
+    '\u{f008b}',
+    '\u{f0085}',
 ];
 const FULL_ICON: char = '\u{f0084}';
 const UNKNOWN_ICON: char = '\u{f0091}';
