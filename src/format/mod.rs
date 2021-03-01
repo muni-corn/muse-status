@@ -88,6 +88,7 @@ pub struct Formatter {
     icon_font: String,
 
     /// A banner queue.
+    #[allow(dead_code)]
     banners: VecDeque<Banner>,
 }
 
@@ -102,6 +103,7 @@ pub enum BannerOutput {
 
 /// A banner temporarily hides all blocks on the status bar to bring information front and center
 /// for a set duration of time.
+#[allow(dead_code)]
 pub struct Banner {
     /// A unique identifier, used to update a banner if a twin (with the same id) is sent.
     id: String,

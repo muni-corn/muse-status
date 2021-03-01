@@ -88,7 +88,7 @@ pub struct BatteryBlock {
 impl BatteryBlock {
     /// Returns a new block with the configuration provided.
     pub fn new(config: BatteryConfig) -> Self {
-        let battery = String::from(config.battery_id);
+        let battery = config.battery_id;
         let next_update_time = Local::now() + Duration::minutes(1);
         Self {
             warning_level: config.warning_level,

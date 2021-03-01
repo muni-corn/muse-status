@@ -91,12 +91,13 @@ impl Block for DateBlock {
 }
 
 /// Returns a greeting based on the hour of the day
+#[allow(dead_code)]
 fn get_greeting() -> String {
     let hour = chrono::Local::now().hour();
 
     let greeting = if hour < 12 {
         "Good morning!"
-    } else if hour >= 12 && hour < 17 {
+    } else if (12..17).contains(&hour) {
         "Good afternoon!"
     } else {
         "Good evening!"

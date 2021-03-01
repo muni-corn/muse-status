@@ -56,7 +56,7 @@ impl MprisBlock {
         };
 
         self.artist = if let Some(av) = metadata.album_artists() {
-            if let Some(first_artist) = av.iter().next() {
+            if let Some(first_artist) = av.get(0) {
                 Some(first_artist.to_string())
             } else {
                 None

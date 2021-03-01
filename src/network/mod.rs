@@ -66,10 +66,11 @@ impl Default for NetworkBlock {
 impl NetworkBlock {
     /// Returns a new NetworkBlock.
     pub fn new(iface_name: &str) -> Result<Self, MuseStatusError> {
-        let mut block: Self = Default::default();
-
-        block.iface_name = String::from(iface_name);
-        block.next_update_time = Local::now() + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS);
+        let block = Self {
+            iface_name: String::from(iface_name),
+            next_update_time: Local::now() + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS),
+            ..Default::default()
+        };
 
         Ok(block)
     }
@@ -93,9 +94,11 @@ impl NetworkBlock {
             NetworkStatus::Unknown => self.unknown_icon,
             _ => {
                 // determine which icons we'll use based on
-                // packet_loss
-                let icons = if self.status == NetworkStatus::PacketLoss {
+                // packet loss or vpn status
+                let icons = if let NetworkStatus::PacketLoss = self.status {
                     &self.packet_loss_icons
+                } else if let NetworkStatus::Vpn = self.status {
+                    &self.vpn_icons
                 } else {
                     &self.connection_icons
                 };
@@ -209,7 +212,7 @@ impl Block for NetworkBlock {
                         // This is probably an error returned by `ping`, which is why we set the status
                         // to PacketLoss here
                         self.status = NetworkStatus::PacketLoss;
-                        return Err(e)
+                        return Err(e);
                     }
                 }
             }
@@ -218,7 +221,7 @@ impl Block for NetworkBlock {
                 self.ssid = None;
             }
             _ => {}
-        } 
+        }
 
         Ok(())
     }
@@ -266,9 +269,9 @@ fn get_interface(interface_name: &str) -> Result<nl80211::Interface, BasicError>
         Err(e) => {
             return Err(BasicError {
                 message: format!(
-                             "couldn't create network block (connecting to netlink socket): {}",
-                             e
-                         ),
+                    "couldn't create network block (connecting to netlink socket): {}",
+                    e
+                ),
             })
         }
     };
