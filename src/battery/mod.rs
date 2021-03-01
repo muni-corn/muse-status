@@ -53,6 +53,7 @@ struct BatteryRead {
 /// A remaining battery level while a battery is discharging, whether measured by percentage or
 /// minutes until complete depletion.
 #[derive(Clone, Copy, Deserialize, Serialize, PartialOrd, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum BatteryLevel {
     /// A value from 0.0 to 1.0.
     Percentage(f32),
