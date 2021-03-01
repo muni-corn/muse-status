@@ -248,11 +248,8 @@ impl ClientArgs {
             Config::from_file(path)?
         } else {
             let path = config::default_config_path()?;
-            if path.exists() {
-                Config::from_file(path)?
-            } else {
-                Config::default()
-            }
+
+            Config::from_file(path)?
         };
 
         result.client_msg = match msg_type {

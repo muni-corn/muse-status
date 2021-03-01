@@ -1,6 +1,6 @@
 use crate::{battery::BatteryLevel, errors::BasicError, errors::MuseStatusError, weather::Units};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::Path, path::PathBuf};
+use std::{collections::HashMap, fs::File, path::Path, path::PathBuf};
 
 /// Configuration for all of muse-status.
 #[derive(Deserialize, Serialize)]
@@ -19,16 +19,16 @@ pub struct Config {
     pub tertiary_order: Vec<String>,
 
     /// The name of the brightness directory in Linux's /sys/class/backlight directory.
-    pub brightness_id: Option<String>,
+    pub brightness_id: String,
 
     /// The name of the user's network interface (like `wlan0`).
-    pub network_interface_name: Option<String>,
+    pub network_interface_name: String,
 
     /// Battery config to use for battery blocks.
-    pub battery_config: Option<BatteryConfig>,
+    pub battery_config: BatteryConfig,
 
     /// Weather config to use for weather blocks.
-    pub weather_config: Option<WeatherConfig>,
+    pub weather_config: WeatherConfig,
 }
 
 impl Default for Config {
@@ -48,22 +48,43 @@ impl Default for Config {
             ],
             tertiary_order: vec![],
 
-            brightness_id: None,
-            network_interface_name: None,
-            battery_config: None,
-            weather_config: None,
+            brightness_id: String::from("amdgpu_bl0"),
+            network_interface_name: String::from("wlan0"),
+
+            battery_config: Default::default(),
+            weather_config: Default::default(),
         }
     }
 }
 
 impl Config {
     /// Parses the configuration file at the path.
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Config, MuseStatusError> {
-        serde_yaml::from_reader(std::fs::File::open(path)?).map_err(|e| {
-            MuseStatusError::Basic(BasicError {
-                message: format!("couldn't parse the configuration file: {}", e),
+    pub fn from_file<P: AsRef<Path>>(p: P) -> Result<Config, MuseStatusError> {
+        let path = p.as_ref();
+        if !path.exists() {
+            // if the file path doesn't exist, write the default config to it, then return the
+            // default config.
+            Self::write_default_config(path)?;
+            Ok(Self::default())
+        } else {
+            // if the path already exists, read and parse
+            serde_yaml::from_reader(File::open(path)?).map_err(|e| {
+                MuseStatusError::Basic(BasicError {
+                    message: format!("couldn't parse the configuration file: {}", e),
+                })
             })
-        })
+        }
+    }
+
+    fn write_default_config(path: &Path) -> Result<(), MuseStatusError> {
+        Ok(std::fs::write(
+            path,
+            serde_yaml::to_string(&Self::default()).map_err(|e| {
+                MuseStatusError::Basic(BasicError {
+                    message: format!("{}", e),
+                })
+            })?,
+        )?)
     }
 }
 

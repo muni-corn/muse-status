@@ -20,15 +20,12 @@ fn main() {
         config::Config::from_file(path).unwrap()
     } else {
         let path = config::default_config_path().unwrap();
-        if path.exists() {
-            config::Config::from_file(path).unwrap()
-        } else {
-            config::Config::default()
-        }
+
+        config::Config::from_file(path).unwrap()
     };
 
     let battery_block =
-        battery::BatteryBlock::new(config.battery_config.clone().unwrap_or_default());
+        battery::BatteryBlock::new(config.battery_config.clone());
     let brightness_block = brightness::BrightnessBlock::new("amdgpu_bl0");
     let date_block = date::DateBlock::new();
     let network_block = match network::NetworkBlock::new("wlan0") {
@@ -41,7 +38,7 @@ fn main() {
     let mpris_block = mpris::MprisBlock::new();
     let volume_block = volume::VolumeBlock::new();
     let weather_block =
-        weather::WeatherBlock::new(config.weather_config.clone().unwrap_or_default());
+        weather::WeatherBlock::new(config.weather_config.clone());
 
     let blocks: Vec<Box<dyn Block>> = vec![
         Box::new(date_block),
