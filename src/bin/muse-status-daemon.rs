@@ -26,9 +26,9 @@ fn main() {
 
     let battery_block =
         battery::BatteryBlock::new(config.battery_config.clone());
-    let brightness_block = brightness::BrightnessBlock::new("amdgpu_bl0");
+    let brightness_block = brightness::BrightnessBlock::new(&config.brightness_id);
     let date_block = date::DateBlock::new();
-    let network_block = match network::NetworkBlock::new("wlan0") {
+    let network_block = match network::NetworkBlock::new(&config.network_interface_name) {
         Ok(n) => n,
         Err(e) => {
             eprintln!("couldn't create network block: {}", e);
