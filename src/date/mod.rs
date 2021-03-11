@@ -5,7 +5,7 @@ use crate::format::Attention;
 use chrono::prelude::*;
 use chrono::{DateTime, Local};
 use std::io::Cursor;
-use rodio::{Device, Source};
+use rodio::Source;
 
 /// The format with which to format time strings.
 pub const TIME_FORMAT: &str = "%-I:%M %P";
@@ -17,21 +17,17 @@ pub struct DateBlock {
     now: DateTime<Local>,
     next_update: DateTime<Local>,
     last_hour: Option<u8>,
-
-    audio_device: Device,
 }
 
 impl Default for DateBlock {
     fn default() -> Self {
         let now = chrono::Local::now();
 
-        let audio_device = rodio::default_output_device().unwrap();
 
         Self {
             now,
             next_update: (now + chrono::Duration::minutes(1)).with_second(0).unwrap(), // don't hate me
             last_hour: None,
-            audio_device,
         }
     }
 }
@@ -43,9 +39,11 @@ impl DateBlock {
     }
 
     fn play_new_hour_sound(&self) {
-        let cursor = Cursor::new(include_bytes!("../new_hour.wav").as_ref());
-        let source = rodio::Decoder::new(cursor).unwrap();
-        rodio::play_raw(&self.audio_device, source.convert_samples());
+        if let Some(audio_device) = rodio::default_output_device() {
+            let cursor = Cursor::new(include_bytes!("../new_hour.wav").as_ref());
+            let source = rodio::Decoder::new(cursor).unwrap();
+            rodio::play_raw(&audio_device, source.convert_samples());
+        }
     }
 }
 
