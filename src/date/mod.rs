@@ -23,7 +23,6 @@ impl Default for DateBlock {
     fn default() -> Self {
         let now = chrono::Local::now();
 
-
         Self {
             now,
             next_update: (now + chrono::Duration::minutes(1)).with_second(0).unwrap(), // don't hate me
@@ -41,8 +40,9 @@ impl DateBlock {
     fn play_new_hour_sound(&self) {
         if let Some(audio_device) = rodio::default_output_device() {
             let cursor = Cursor::new(include_bytes!("../new_hour.wav").as_ref());
-            let source = rodio::Decoder::new(cursor).unwrap();
-            rodio::play_raw(&audio_device, source.convert_samples());
+            if let Ok(source) = rodio::Decoder::new(cursor) {
+                rodio::play_raw(&audio_device, source.convert_samples());
+            }
         }
     }
 }
