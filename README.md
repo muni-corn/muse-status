@@ -10,3 +10,16 @@ setup.
 -	`i3bar`/`swaybar`
 
 -	Pango markup
+
+# Building
+
+The following (Void Linux) dependencies are required to build `muse-status` and
+its daemon:
+
+-	pkg-config
+
+-	alsa-lib-devel
+
+-	dbus-devel
+
+-	openssl-devel
