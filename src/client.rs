@@ -55,7 +55,7 @@ impl Client {
             )?;
 
             // if Subscribe, handle the subscription. if Update, send request and quit.
-            // self.args.client_msg is cloned in the case that we handle a subscription and `self` must be
+            // `self.args.client_msg` is cloned in the case that we handle a subscription and `self` must be
             // moved
             if let ClientMsg::Subscribe(c) = self.args.client_msg.clone() {
                 self.handle_subscription(stream, &c);
@@ -72,6 +72,7 @@ impl Client {
     pub fn handle_subscription(mut self, mut daemon_conn: TcpStream, collection: &Collection) -> ! {
         let formatter = Formatter::from_env().unwrap();
 
+        // if using the json protocol, this header is needed
         if let crate::format::Mode::JsonProtocol = formatter.get_format_mode() {
             println!("{{\"version\":1}}");
             println!("[[]");
