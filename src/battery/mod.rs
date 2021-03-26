@@ -320,7 +320,7 @@ impl Block for BatteryBlock {
                             if self.is_alarm() {
                                 Attention::AlarmPulse
                             } else if self.is_warning() {
-                                Attention::WarningPulse
+                                Attention::Warning
                             } else {
                                 Attention::Normal
                             }
