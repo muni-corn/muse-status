@@ -303,7 +303,7 @@ impl Formatter {
         let now = chrono::Local::now();
 
         // get alpha byte value. interpolation is a value from
-        // zero to one, calculated by unixMillis/maxMillis
+        // zero to one, calculated by `unix_millis / max_millis`
         let max_millis: u64 = (1000.0 * seconds) as u64;
         let unix_millis: u128 = (now.timestamp_nanos() as u128
             / Duration::from_millis(1).as_nanos() as u128)
@@ -313,12 +313,12 @@ impl Formatter {
         color::interpolate_colors(&self.secondary_color, &color, interpolation)
     }
 
-    /// A convenience method for giving an alarm pulse color.
+    /// A convenience method for giving a standard, pulsing alarm color.
     pub fn get_alarm_pulse_color(&self) -> RGBA {
         self.get_pulse_color(&self.alarm_color, 1.0)
     }
 
-    /// A convenience method for giving a warning pulse color.
+    /// A convenience method for giving a standard, pulsing warning color.
     pub fn get_warn_pulse_color(&self) -> RGBA {
         self.get_pulse_color(&self.warning_color, 2.0)
     }

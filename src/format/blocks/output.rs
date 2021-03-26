@@ -88,12 +88,16 @@ impl NiceOutput {
             Attention::Warning => (f.warning_color.clone(), f.warning_color.clone()),
             Attention::Alarm => (f.alarm_color.clone(), f.alarm_color.clone()),
             Attention::WarningPulse => {
-                let c = f.get_warn_pulse_color();
-                (c.clone(), c)
+                // TODO
+                // let c = f.get_warn_pulse_color();
+                // (c.clone(), c)
+                (f.warning_color.clone(), f.warning_color.clone())
             }
             Attention::AlarmPulse => {
-                let c = f.get_alarm_pulse_color();
-                (c.clone(), c)
+                // TODO
+                // let c = f.get_alarm_pulse_color();
+                // (c.clone(), c)
+                (f.alarm_color.clone(), f.alarm_color.clone())
             }
         };
 
