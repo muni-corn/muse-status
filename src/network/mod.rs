@@ -337,8 +337,8 @@ pub enum NetworkStatus {
 impl NetworkStatus {
     fn to_string(&self) -> Option<String> {
         match self {
-            Self::Disconnected => Some(String::from("No connection")),
-            Self::PacketLoss => Some(String::from("Connection problem")),
+            Self::Disconnected => Some(String::from("Not connected")),
+            Self::PacketLoss => Some(String::from("No Internet")),
             Self::Connecting => Some(String::from("Connecting")),
             Self::Connected => None,
             Self::SignInRequired => Some(String::from("Sign-in required")),
