@@ -195,20 +195,20 @@ impl BatteryBlock {
     fn get_nanos_left(&self) -> Option<i64> {
         match &self.current_read {
             Some(r) => {
-                let end = match &r.status {
+                let goal_percentage = match &r.status {
                     ChargeStatus::Discharging => 0,
                     ChargeStatus::Charging => self.charge_full,
-                    _ => 0,
+                    _ => return None,
                 };
 
                 // charge units left * duration per charge unit
                 let rate = match &r.status {
                     ChargeStatus::Charging => self.average_charging_rate,
                     ChargeStatus::Discharging => self.average_discharging_rate,
-                    _ => 0.0,
+                    _ => return None,
                 };
 
-                let nanos_left = (end - r.charge) as f32 * rate;
+                let nanos_left = (goal_percentage - r.charge) as f32 * rate;
                 Some(nanos_left as i64)
             }
             None => None,
