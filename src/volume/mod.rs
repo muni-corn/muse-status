@@ -4,11 +4,26 @@ use crate::format::blocks::Block;
 use crate::format::Attention;
 use std::process;
 
+/// Enums are great
+#[derive(Debug, Eq, PartialEq)]
+pub enum Volume {
+    /// Volume is unmuted with a value from 0 to 100 (maybe more).
+    On(i32),
+
+    /// Volume is muted.
+    Off,
+}
+
+impl Default for Volume {
+    fn default() -> Self {
+        Self::Off
+    }
+}
+
 /// VolumeBlock provides information for the system's audio volume. Requires `amixer`.
 #[derive(Default)]
 pub struct VolumeBlock {
-    current_volume: i32,
-    muted: bool,
+    current_volume: Volume,
 }
 
 impl VolumeBlock {
@@ -19,16 +34,162 @@ impl VolumeBlock {
 
     const MAX_WAIT_SECONDS: u64 = 30;
 
-    fn get_volume_info(&self) -> String {
-        let mut wait_time_seconds = 1;
-        loop {
-            if let Ok(output) = process::Command::new("amixer")
-                .args(&["sget", "Master"])
+    /// Gets the system volume from the `pamixer` command
+    fn volume_from_pamixer(&self) -> Result<Volume, UpdateError> {
+        let muted = process::Command::new("pamixer")
+            .args(&["--get-mute"])
+            .output()
+            .map(|output| String::from_utf8(output.stdout).map(|b| { 
+                #[cfg(debug_assertions)]
+                {
+                    println!("parsing `{}` as bool", b.trim())
+                }
+                b.trim().parse::<bool>() 
+            }))
+            .map_err(|e| UpdateError {
+                block_name: "volume".to_string(),
+                message: format!("{}", e),
+            })?
+            .map_err(|e| UpdateError {
+                block_name: "volume".to_string(),
+                message: format!("{}", e),
+            })?
+            .map_err(|e| UpdateError {
+                block_name: "volume".to_string(),
+                message: format!("{}", e),
+            })?;
+
+        if muted {
+            Ok(Volume::Off)
+        } else {
+            let num = process::Command::new("pamixer")
+                .args(&["--get-volume"])
                 .output()
-            {
-                if let Ok(info) = String::from_utf8(output.stdout) {
-                    if let Some(last_line) = info.lines().last() {
-                        return last_line.to_string();
+                .map(|output| String::from_utf8(output.stdout).map(|num| {
+                    #[cfg(debug_assertions)]
+                    {
+                        println!("parsing `{}` as i32", num.trim())
+                    }
+                    num.trim().parse::<i32>()
+                }))
+                .map_err(|e| UpdateError {
+                    block_name: "volume".to_string(),
+                    message: format!("{}", e),
+                })?
+                .map_err(|e| UpdateError {
+                    block_name: "volume".to_string(),
+                    message: format!("{}", e),
+                })?
+                .map_err(|e| UpdateError {
+                    block_name: "volume".to_string(),
+                    message: format!("{}", e),
+                })?;
+
+            Ok(Volume::On(num))
+        }
+    }
+
+    /// Gets the system volume from the `amixer` command
+    fn volume_from_amixer(&self) -> Result<Volume, UpdateError> {
+        let raw_string_opt = process::Command::new("amixer")
+            .args(&["sget", "Master"])
+            .output()
+            .map(|output| {
+                String::from_utf8(output.stdout)
+                    .map(|info| info.lines().last().map(|last_line| last_line.to_string()))
+            })
+            .map_err(|e| UpdateError {
+                block_name: "volume".to_string(),
+                message: format!("{}", e),
+            })?
+            .map_err(|e| UpdateError {
+                block_name: "volume".to_string(),
+                message: format!("{}", e),
+            })?;
+
+        if let Some(raw_string) = raw_string_opt {
+            match raw_string.chars().position(|c| c == '[') {
+                Some(i) => {
+                    let line_end = &raw_string[i..];
+
+                    if line_end.contains("off") {
+                        Ok(Volume::Off)
+                    } else {
+                        // filters out any non-digit characters past the first opening bracket to parse the
+                        // volume amount
+                        let raw_percent = line_end
+                            .chars()
+                            .filter(|c| c.is_digit(10))
+                            .collect::<String>();
+
+                        let current_volume =
+                            raw_percent.parse::<i32>().map_err(|e| UpdateError {
+                                block_name: String::from("volume"),
+                                message: format!(
+                                    "couldn't parse volume from `{}`: {}",
+                                    raw_percent, e
+                                ),
+                            })?;
+
+                        Ok(Volume::On(current_volume))
+                    }
+                }
+                None => Err(UpdateError {
+                    block_name: String::from("volume"),
+                    message: String::from(
+                        "couldn't find square bracket delimiter in amixer output",
+                    ),
+                }),
+            }
+        } else {
+            Err(UpdateError {
+                block_name: String::from("volume"),
+                message: String::from("couldn't get any output to parse from (amixer)"),
+            })
+        }
+    }
+
+    fn get_icon(&self) -> char {
+        match self.current_volume {
+            Volume::On(0) => ZERO_ICON,
+            Volume::On(x) => {
+                let index = (x as usize * VOLUME_ICONS.len() / 100).min(VOLUME_ICONS.len() - 1);
+
+                VOLUME_ICONS[index]
+            }
+            Volume::Off => MUTE_ICON,
+        }
+    }
+
+    fn get_text(&self) -> String {
+        match self.current_volume {
+            Volume::Off | Volume::On(0) => String::from("Muted"),
+            Volume::On(x) => format!("{}%", x),
+        }
+    }
+
+    // vim: foldmethod=marker
+}
+
+impl Block for VolumeBlock {
+    fn update(&mut self) -> Result<(), UpdateError> {
+        let mut wait_time_seconds = 1;
+        self.current_volume = loop {
+            match self.volume_from_pamixer() {
+                Ok(vol) => break vol,
+                Err(_e) => {
+                    #[cfg(debug_assertions)]
+                    {
+                        eprintln!("{}", _e);
+                    }
+                    match self.volume_from_amixer() {
+                        Ok(vol) => break vol,
+                        Err(_e) => {
+                            #[cfg(debug_assertions)]
+                            {
+                                eprintln!("{}", _e);
+                            }
+                        }
                     }
                 }
             }
@@ -39,74 +200,9 @@ impl VolumeBlock {
             if wait_time_seconds < Self::MAX_WAIT_SECONDS {
                 wait_time_seconds = Self::MAX_WAIT_SECONDS.min(wait_time_seconds * 2);
             }
-        }
-    }
+        };
 
-    // returns the current volume percentage as an i32, or zero
-    // if muted
-    fn update_current_volume(&mut self) -> Result<(), UpdateError> {
-        let info = self.get_volume_info();
-
-        match info.chars().position(|c| c == '[') {
-            Some(i) => {
-                let line_end = &info[i..];
-
-                // first, are we muted?
-                self.muted = if line_end.contains("on") {
-                    false
-                } else if line_end.contains("off") {
-                    true
-                } else {
-                    return Err(UpdateError {
-                        block_name: String::from("volume"),
-                        message: String::from(
-                            "couldn't parse if volume is definitely muted or not",
-                        ),
-                    });
-                };
-
-                if !self.muted {
-                    // filters out any non-digit characters past the first opening bracket to parse the
-                    // volume amount
-                    let raw_percent = line_end
-                        .chars()
-                        .filter(|c| c.is_digit(10))
-                        .collect::<String>();
-
-                    self.current_volume = raw_percent.parse::<i32>().map_err(|e| UpdateError {
-                        block_name: String::from("volume"),
-                        message: format!("couldn't parse volume from `{}`: {}", raw_percent, e),
-                    })?;
-                }
-
-                Ok(())
-            }
-            None => Err(UpdateError {
-                block_name: String::from("volume"),
-                message: String::from("couldn't parse amixer output"),
-            }),
-        }
-    }
-
-    fn get_icon(&self) -> char {
-        if self.current_volume == 0 {
-            ZERO_ICON
-        } else if self.muted {
-            MUTE_ICON
-        } else {
-            let index = (self.current_volume as usize * VOLUME_ICONS.len() / 100)
-                .min(VOLUME_ICONS.len() - 1);
-
-            VOLUME_ICONS[index]
-        }
-    }
-
-    // vim: foldmethod=marker
-}
-
-impl Block for VolumeBlock {
-    fn update(&mut self) -> Result<(), UpdateError> {
-        self.update_current_volume()
+        Ok(())
     }
 
     fn name(&self) -> &str {
@@ -120,11 +216,7 @@ impl Block for VolumeBlock {
     fn output(&self) -> Option<BlockOutputContent> {
         Some(BlockOutputContent::Nice(NiceOutput {
             icon: self.get_icon(),
-            primary_text: if self.muted || self.current_volume == 0 {
-                String::from("Muted")
-            } else {
-                format!("{}%", self.current_volume)
-            },
+            primary_text: self.get_text(),
             secondary_text: None,
             attention: Attention::Dim,
         }))
