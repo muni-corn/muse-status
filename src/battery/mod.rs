@@ -22,7 +22,7 @@ pub enum ChargeStatus {
     /// The status of the battery isn't known.
     Unknown,
 
-    /// The battery is full and charging.
+    /// The battery is full and still plugged in.
     Full,
 }
 
@@ -195,7 +195,7 @@ impl BatteryBlock {
     fn get_nanos_left(&self) -> Option<i64> {
         match &self.current_read {
             Some(r) => {
-                let goal_percentage = match &r.status {
+                let target_percentage = match &r.status {
                     ChargeStatus::Discharging => 0,
                     ChargeStatus::Charging => self.charge_full,
                     _ => return None,
@@ -208,7 +208,7 @@ impl BatteryBlock {
                     _ => return None,
                 };
 
-                let nanos_left = (goal_percentage - r.charge) as f32 * rate;
+                let nanos_left = (target_percentage - r.charge) as f32 * rate;
                 Some(nanos_left as i64)
             }
             None => None,
@@ -255,11 +255,11 @@ impl BatteryBlock {
     fn is_alarm(&self) -> bool {
         match self.alarm_level {
             BatteryLevel::MinutesLeft(alarm_minutes) => match self.get_minutes_left() {
-                Some(battery_minutes) => battery_minutes <= alarm_minutes,
+                Some(minutes_left) => minutes_left <= alarm_minutes,
                 None => false,
             },
             BatteryLevel::Percentage(alarm_percentage) => match self.get_percent_left() {
-                Some(battery_percentage) => battery_percentage <= alarm_percentage,
+                Some(percentage_left) => percentage_left <= alarm_percentage,
                 None => false,
             },
         }
@@ -400,9 +400,9 @@ impl Block for BatteryBlock {
     }
 }
 
-fn get_new_average_rate(avg_rate_now: f32, reads: i32, new_read_rate: f32) -> f32 {
-    let reads_f = reads as f32;
-    (avg_rate_now * reads_f) / (reads_f + 1.0) + new_read_rate / (reads_f + 1.0)
+fn get_new_average_rate(avg_rate_now: f32, reads_so_far: i32, most_recent_read_rate: f32) -> f32 {
+    let reads = reads_so_far as f32;
+    (avg_rate_now * reads) / (reads + 1.0) + most_recent_read_rate / (reads + 1.0)
 }
 
 const DISCHARGING_ICONS: [char; 11] = [

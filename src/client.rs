@@ -38,31 +38,36 @@ impl Client {
     /// know it was summoned. You'll just think that nothing happened, because that's exactly what
     /// Noop does.
     pub fn act(self) -> Result<(), MuseStatusError> {
-        if let ClientMsg::Noop = &self.args.client_msg {
-            #[cfg(debug_assertions)]
-            println!("doing nothing; exiting");
+        match &self.args.client_msg {
+            ClientMsg::Noop => {
+                #[cfg(debug_assertions)]
+                println!("doing nothing; exiting");
 
-            // girl bye
-            Ok(())
-        } else {
-            #[cfg(debug_assertions)]
-            println!("sending action to daemon: {:?}", self.args.client_msg);
-
-            // for anything else, we'll need a connection to the daemon.
-            let mut stream = get_daemon_connection(&self.args.config.daemon_addr);
-            stream.write_all(
-                format!("{}\n", serde_json::to_string(&self.args.client_msg)?).as_bytes(),
-            )?;
-
-            // if Subscribe, handle the subscription. if Update, send request and quit.
-            // `self.args.client_msg` is cloned in the case that we handle a subscription and `self` must be
-            // moved
-            if let ClientMsg::Subscribe(c) = self.args.client_msg.clone() {
-                self.handle_subscription(stream, &c);
-            } else {
-                // if Update or somehow Noop, the client does not need to maintain its connection
-                // to the daemon, so we just return
+                // girl bye
                 Ok(())
+            }
+            _ => {
+                #[cfg(debug_assertions)]
+                println!("sending action to daemon: {:?}", self.args.client_msg);
+
+                // for anything else, we'll need a connection to the daemon.
+                let mut stream = get_daemon_connection(&self.args.config.daemon_addr);
+                stream.write_all(
+                    format!("{}\n", serde_json::to_string(&self.args.client_msg)?).as_bytes(),
+                )?;
+
+                // if Subscribe, handle the subscription. if Update, send request and quit.
+                match &self.args.client_msg {
+                    ClientMsg::Subscribe(c) => {
+                        self.handle_subscription(stream, &c);
+                    }
+                    ClientMsg::Update => {
+                        // if Update, the client does not need to maintain its connection
+                        // to the daemon, so we just return
+                        Ok(())
+                    }
+                    ClientMsg::Noop => unreachable!(),
+                }
             }
         }
     }
@@ -132,8 +137,8 @@ impl Client {
             Collection::Primary => DataPayload::only_primary(config, &self.data),
             Collection::Secondary => DataPayload::only_secondary(config, &self.data),
             Collection::Tertiary => DataPayload::only_tertiary(config, &self.data),
-            Collection::One(b) => DataPayload::from_one(b, &self.data),
-            Collection::Many(n) => DataPayload::from_many(&n, &self.data),
+            Collection::One(block) => DataPayload::from_one(block, &self.data),
+            Collection::Many(names) => DataPayload::from_many(&names, &self.data),
         };
 
         println!("{}", f.format_data(data));
