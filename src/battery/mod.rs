@@ -74,10 +74,10 @@ pub struct BatteryBlock {
     charge_full: i32,
 
     charging_reads_since_last_anchor: i32,
-    average_charging_rate: f32,
+    average_charging_rate: Option<f32>,
 
     discharging_reads_since_last_anchor: i32,
-    average_discharging_rate: f32,
+    average_discharging_rate: Option<f32>,
 
     current_read: Option<BatteryRead>,
     last_read: Option<BatteryRead>,
@@ -98,9 +98,11 @@ impl BatteryBlock {
             charge_full: 0,
 
             charging_reads_since_last_anchor: 0,
-            average_charging_rate: 0.0,
+            average_charging_rate: None,
+
             discharging_reads_since_last_anchor: 0,
-            average_discharging_rate: 0.0,
+            average_discharging_rate: None,
+
             current_read: None,
             last_read: None,
 
@@ -113,11 +115,11 @@ impl BatteryBlock {
             match &r.status {
                 ChargeStatus::Discharging => {
                     if rate_now < 0.0 {
-                        self.average_discharging_rate = get_new_average_rate(
+                        self.average_discharging_rate = Some(get_new_average_rate(
                             self.average_discharging_rate,
                             self.discharging_reads_since_last_anchor,
                             rate_now,
-                        );
+                        ));
 
                         if self.discharging_reads_since_last_anchor < MAX_READS {
                             self.discharging_reads_since_last_anchor += 1;
@@ -126,11 +128,11 @@ impl BatteryBlock {
                 }
                 ChargeStatus::Charging => {
                     if rate_now > 0.0 {
-                        self.average_charging_rate = get_new_average_rate(
+                        self.average_charging_rate = Some(get_new_average_rate(
                             self.average_charging_rate,
                             self.charging_reads_since_last_anchor,
                             rate_now,
-                        );
+                        ));
 
                         if self.charging_reads_since_last_anchor < MAX_READS {
                             self.charging_reads_since_last_anchor += 1;
@@ -193,26 +195,21 @@ impl BatteryBlock {
     /// Returns the amount of nanoseconds left until the battery will be either fully charged or
     /// completely depleted.
     fn get_nanos_left(&self) -> Option<i64> {
-        match &self.current_read {
-            Some(r) => {
-                let target_percentage = match &r.status {
-                    ChargeStatus::Discharging => 0,
-                    ChargeStatus::Charging => self.charge_full,
-                    _ => return None,
-                };
+        let rate = match &self.current_read.as_ref()?.status {
+            ChargeStatus::Charging => self.average_charging_rate?,
+            ChargeStatus::Discharging => self.average_discharging_rate?,
+            _ => return None,
+        };
 
-                // charge units left * duration per charge unit
-                let rate = match &r.status {
-                    ChargeStatus::Charging => self.average_charging_rate,
-                    ChargeStatus::Discharging => self.average_discharging_rate,
-                    _ => return None,
-                };
+        let target_percentage = match &self.current_read.as_ref()?.status {
+            ChargeStatus::Discharging => 0,
+            ChargeStatus::Charging => self.charge_full,
+            _ => return None,
+        };
 
-                let nanos_left = (target_percentage - r.charge) as f32 * rate;
-                Some(nanos_left as i64)
-            }
-            None => None,
-        }
+        // charge units left * duration per charge unit
+        let nanos_left = (target_percentage - self.current_read.as_ref()?.charge) as f32 * rate;
+        Some(nanos_left as i64)
     }
 
     /// Returns the amount of minutes left until the battery will be either fully charged or
@@ -400,9 +397,9 @@ impl Block for BatteryBlock {
     }
 }
 
-fn get_new_average_rate(avg_rate_now: f32, reads_so_far: i32, most_recent_read_rate: f32) -> f32 {
+fn get_new_average_rate(avg_rate_now: Option<f32>, reads_so_far: i32, most_recent_read_rate: f32) -> f32 {
     let reads = reads_so_far as f32;
-    (avg_rate_now * reads) / (reads + 1.0) + most_recent_read_rate / (reads + 1.0)
+    (avg_rate_now.unwrap_or(0.0) * reads) / (reads + 1.0) + most_recent_read_rate / (reads + 1.0)
 }
 
 const DISCHARGING_ICONS: [char; 11] = [
