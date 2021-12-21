@@ -24,8 +24,7 @@ fn main() {
         config::Config::from_file(path).unwrap()
     };
 
-    let battery_block =
-        battery::BatteryBlock::new(config.battery_config.clone());
+    let battery_block = battery::BatteryBlock::new(config.battery_config.clone());
     let brightness_block = brightness::BrightnessBlock::new(&config.brightness_id);
     let date_block = date::DateBlock::new();
     let network_block = match network::NetworkBlock::new(&config.network_interface_name) {
@@ -37,8 +36,7 @@ fn main() {
     };
     let mpris_block = mpris::MprisBlock::new();
     let volume_block = volume::VolumeBlock::new();
-    let weather_block =
-        weather::WeatherBlock::new(config.weather_config.clone());
+    let weather_block = weather::WeatherBlock::new(config.weather_config.clone());
 
     let blocks: Vec<Box<dyn Block>> = vec![
         Box::new(date_block),

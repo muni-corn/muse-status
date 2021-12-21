@@ -1,6 +1,6 @@
+use crate::errors::*;
 use std::fs;
 use std::path::Path;
-use crate::errors::*;
 
 /// Returns a number in a file
 pub fn get_int_from_file(filepath: &Path) -> Result<i32, MuseStatusError> {
@@ -17,4 +17,3 @@ pub fn cubic_ease_arc(mut x: f32) -> f32 {
 
     cubic
 }
-

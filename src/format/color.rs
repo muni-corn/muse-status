@@ -110,8 +110,14 @@ impl RGBA {
     /// the mode that muse-status is in
     pub fn hex_string(&self, mode: Mode) -> String {
         match mode {
-            Mode::Lemonbar => format!("{:08x}", u32::from_be_bytes([self.a, self.r, self.g, self.b])),
-            _ => format!("{:08x}", u32::from_be_bytes([self.r, self.g, self.b, self.a])),
+            Mode::Lemonbar => format!(
+                "{:08x}",
+                u32::from_be_bytes([self.a, self.r, self.g, self.b])
+            ),
+            _ => format!(
+                "{:08x}",
+                u32::from_be_bytes([self.r, self.g, self.b, self.a])
+            ),
         }
     }
 }

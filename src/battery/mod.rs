@@ -397,7 +397,11 @@ impl Block for BatteryBlock {
     }
 }
 
-fn get_new_average_rate(avg_rate_now: Option<f32>, reads_so_far: i32, most_recent_read_rate: f32) -> f32 {
+fn get_new_average_rate(
+    avg_rate_now: Option<f32>,
+    reads_so_far: i32,
+    most_recent_read_rate: f32,
+) -> f32 {
     let reads = reads_so_far as f32;
     (avg_rate_now.unwrap_or(0.0) * reads) / (reads + 1.0) + most_recent_read_rate / (reads + 1.0)
 }

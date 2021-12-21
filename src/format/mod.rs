@@ -365,10 +365,10 @@ impl Formatter {
     /// Formats the BlockOutput for plain markup output.
     fn block_output_as_markup(&self, b: &BlockOutput) -> Option<String> {
         b.body.as_ref().map(|body| match body {
-                BlockOutputContent::Nice(n) => n.as_pango_strings(self).0,
-                BlockOutputContent::SingleBit(b) => b.as_pango_string(self),
-                BlockOutputContent::Custom(c) => c.clone(),
-            })
+            BlockOutputContent::Nice(n) => n.as_pango_strings(self).0,
+            BlockOutputContent::SingleBit(b) => b.as_pango_string(self),
+            BlockOutputContent::Custom(c) => c.clone(),
+        })
     }
 }
 

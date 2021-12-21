@@ -1,10 +1,10 @@
-use std::fmt::{Display, Formatter};
-use std::fmt;
-use std::num::ParseIntError;
-use std::io::Error as IoError;
-use crate::format::color::RGBAParseError;
 use crate::format::blocks::output::BlockOutput;
+use crate::format::color::RGBAParseError;
 use std::error::Error;
+use std::fmt;
+use std::fmt::{Display, Formatter};
+use std::io::Error as IoError;
+use std::num::ParseIntError;
 use std::sync::mpsc::SendError;
 
 /// Wraps a number of errors that could be encountered throughout muse-status.
@@ -31,16 +31,14 @@ pub enum MuseStatusError {
 
 impl From<String> for MuseStatusError {
     fn from(s: String) -> Self {
-        Self::Basic(BasicError {
-            message: s
-        })
+        Self::Basic(BasicError { message: s })
     }
 }
 
 impl From<serde_json::error::Error> for MuseStatusError {
     fn from(e: serde_json::error::Error) -> Self {
         Self::Basic(BasicError {
-            message: format!("problem with serialization: {}", e)
+            message: format!("problem with serialization: {}", e),
         })
     }
 }
@@ -100,7 +98,7 @@ impl Error for MuseStatusError {}
 #[derive(Debug)]
 pub struct BasicError {
     /// The message to this error.
-    pub message: String
+    pub message: String,
 }
 
 impl Display for BasicError {

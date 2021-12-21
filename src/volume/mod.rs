@@ -39,13 +39,15 @@ impl VolumeBlock {
         let muted = process::Command::new("pamixer")
             .args(&["--get-mute"])
             .output()
-            .map(|output| String::from_utf8(output.stdout).map(|b| { 
-                #[cfg(debug_assertions)]
-                {
-                    println!("parsing `{}` as bool", b.trim())
-                }
-                b.trim().parse::<bool>() 
-            }))
+            .map(|output| {
+                String::from_utf8(output.stdout).map(|b| {
+                    #[cfg(debug_assertions)]
+                    {
+                        println!("parsing `{}` as bool", b.trim())
+                    }
+                    b.trim().parse::<bool>()
+                })
+            })
             .map_err(|e| UpdateError {
                 block_name: "volume".to_string(),
                 message: format!("{}", e),
@@ -65,13 +67,15 @@ impl VolumeBlock {
             let num = process::Command::new("pamixer")
                 .args(&["--get-volume"])
                 .output()
-                .map(|output| String::from_utf8(output.stdout).map(|num| {
-                    #[cfg(debug_assertions)]
-                    {
-                        println!("parsing `{}` as i32", num.trim())
-                    }
-                    num.trim().parse::<i32>()
-                }))
+                .map(|output| {
+                    String::from_utf8(output.stdout).map(|num| {
+                        #[cfg(debug_assertions)]
+                        {
+                            println!("parsing `{}` as i32", num.trim())
+                        }
+                        num.trim().parse::<i32>()
+                    })
+                })
                 .map_err(|e| UpdateError {
                     block_name: "volume".to_string(),
                     message: format!("{}", e),

@@ -237,14 +237,16 @@ impl Block for WeatherBlock {
     }
 
     fn output(&self) -> Option<BlockOutputContent> {
-        self.current_report.as_ref().map(|r| BlockOutputContent::from(NiceOutput {
+        self.current_report.as_ref().map(|r| {
+            BlockOutputContent::from(NiceOutput {
                 attention: Attention::Normal,
                 icon: self.get_weather_icon(r),
                 primary_text: self
                     .get_temperature_string()
                     .unwrap_or_else(|| "".to_string()),
                 secondary_text: self.get_weather_description(),
-            }))
+            })
+        })
     }
 
     fn next_update_time(&self) -> Option<chrono::DateTime<chrono::Local>> {

@@ -76,11 +76,16 @@ impl MprisBlock {
         };
 
         assert!(players.first().is_some());
-        let player = players.iter().find(|p| if let Ok(status) = p.get_playback_status() {
-            status == mpris::PlaybackStatus::Playing
-        } else {
-            false
-        }).unwrap_or_else(|| players.first().unwrap());
+        let player = players
+            .iter()
+            .find(|p| {
+                if let Ok(status) = p.get_playback_status() {
+                    status == mpris::PlaybackStatus::Playing
+                } else {
+                    false
+                }
+            })
+            .unwrap_or_else(|| players.first().unwrap());
 
         {
             let mut block = mutex.lock().unwrap();
@@ -89,7 +94,9 @@ impl MprisBlock {
                 message: format!("{}", e),
             })?;
             block.set_metadata(metadata);
-            block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
+            block_sender
+                .send(BlockOutput::new(block.name(), block.output()))
+                .unwrap();
         }
 
         match player.events() {
@@ -109,17 +116,20 @@ impl MprisBlock {
                         _ => (),
                     }
 
-                    block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
+                    block_sender
+                        .send(BlockOutput::new(block.name(), block.output()))
+                        .unwrap();
                 }
-            },
-            Err(e) => eprintln!("error getting player events: {}", e)
-
+            }
+            Err(e) => eprintln!("error getting player events: {}", e),
         }
 
         {
             let mut block = mutex.lock().unwrap();
             block.status = PlayerStatus::Stopped;
-            block_sender.send(BlockOutput::new(block.name(), block.output())).unwrap();
+            block_sender
+                .send(BlockOutput::new(block.name(), block.output()))
+                .unwrap();
         }
 
         Ok(())
@@ -144,7 +154,7 @@ impl Block for MprisBlock {
                 // sleep after every iteration to prevent spamming
                 thread::sleep(std::time::Duration::from_secs(5));
             })
-        .unwrap();
+            .unwrap();
 
         (vec![player_listen_handle], notify_tx)
     }
