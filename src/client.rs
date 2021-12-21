@@ -57,11 +57,11 @@ impl Client {
                 )?;
 
                 // if Subscribe, handle the subscription. if Update, send request and quit.
-                match &self.args.client_msg {
+                match self.args.client_msg.clone() {
                     ClientMsg::Subscribe(c) => {
                         self.handle_subscription(stream, &c);
                     }
-                    ClientMsg::Update => {
+                    ClientMsg::Update(_) => {
                         // if Update, the client does not need to maintain its connection
                         // to the daemon, so we just return
                         Ok(())
