@@ -237,8 +237,7 @@ impl Block for WeatherBlock {
     }
 
     fn output(&self) -> Option<BlockOutputContent> {
-        if let Some(r) = &self.current_report {
-            Some(BlockOutputContent::from(NiceOutput {
+        self.current_report.as_ref().map(|r| BlockOutputContent::from(NiceOutput {
                 attention: Attention::Normal,
                 icon: self.get_weather_icon(r),
                 primary_text: self
@@ -246,9 +245,6 @@ impl Block for WeatherBlock {
                     .unwrap_or_else(|| "".to_string()),
                 secondary_text: self.get_weather_description(),
             }))
-        } else {
-            None
-        }
     }
 
     fn next_update_time(&self) -> Option<chrono::DateTime<chrono::Local>> {

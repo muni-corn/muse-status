@@ -49,18 +49,10 @@ impl MprisBlock {
     }
 
     fn set_metadata(&mut self, metadata: mpris::Metadata) {
-        self.title = if let Some(t) = metadata.title() {
-            Some(String::from(t))
-        } else {
-            None
-        };
+        self.title = metadata.title().map(String::from);
 
         self.artist = if let Some(av) = metadata.album_artists() {
-            if let Some(first_artist) = av.get(0) {
-                Some(first_artist.to_string())
-            } else {
-                None
-            }
+            av.get(0).map(|first_artist| first_artist.to_string())
         } else {
             None
         };

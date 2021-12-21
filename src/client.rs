@@ -138,7 +138,7 @@ impl Client {
             Collection::Secondary => DataPayload::only_secondary(config, &self.data),
             Collection::Tertiary => DataPayload::only_tertiary(config, &self.data),
             Collection::One(block) => DataPayload::from_one(block, &self.data),
-            Collection::Many(names) => DataPayload::from_many(&names, &self.data),
+            Collection::Many(names) => DataPayload::from_many(names, &self.data),
         };
 
         println!("{}", f.format_data(data));

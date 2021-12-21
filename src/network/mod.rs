@@ -278,7 +278,7 @@ fn get_interface(interface_name: &str) -> Result<nl80211::Interface, BasicError>
 
     for iface in interfaces {
         if let Some(n) = &iface.name {
-            if nl80211::parse_string(&n).as_str().trim_matches('\u{0}') == interface_name {
+            if nl80211::parse_string(n).as_str().trim_matches('\u{0}') == interface_name {
                 return Ok(iface);
             }
         }

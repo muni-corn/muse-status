@@ -21,7 +21,7 @@ impl Bit {
     /// Formats the Bit for lemonbar ouptut.
     pub fn as_lemonbar_string(&self, f: &Formatter) -> String {
         if let Some(c) = &self.color {
-            let rgba = f.color_to_rgba(&c);
+            let rgba = f.color_to_rgba(c);
             format!("%{{F#{}}}{}", rgba.hex_string(Mode::Lemonbar), self.text) // %{F#aabbccdd}text
         } else {
             self.text.clone()
@@ -33,7 +33,7 @@ impl Bit {
         let escaped = xml_escape(&self.text);
         match &self.color {
             Some(c) => {
-                let rgba = f.color_to_rgba(&c);
+                let rgba = f.color_to_rgba(c);
                 match &self.font {
                     Some(f) => format!(
                         r##"<span color='#{}' font_desc='{}'>{}</span>"##,

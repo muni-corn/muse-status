@@ -147,7 +147,7 @@ impl Daemon {
                         );
                     }
                 }
-                Err(e) => panic!(e),
+                Err(e) => std::panic::panic_any(e),
             }
         }
     }

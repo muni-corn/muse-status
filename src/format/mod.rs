@@ -310,7 +310,7 @@ impl Formatter {
             % max_millis as u128;
         let interpolation = utils::cubic_ease_arc((unix_millis / max_millis as u128) as f32);
 
-        color::interpolate_colors(&self.secondary_color, &color, interpolation)
+        color::interpolate_colors(&self.secondary_color, color, interpolation)
     }
 
     /// A convenience method for giving a standard, pulsing alarm color.
@@ -364,15 +364,11 @@ impl Formatter {
 
     /// Formats the BlockOutput for plain markup output.
     fn block_output_as_markup(&self, b: &BlockOutput) -> Option<String> {
-        if let Some(body) = &b.body {
-            Some(match body {
+        b.body.as_ref().map(|body| match body {
                 BlockOutputContent::Nice(n) => n.as_pango_strings(self).0,
                 BlockOutputContent::SingleBit(b) => b.as_pango_string(self),
                 BlockOutputContent::Custom(c) => c.clone(),
             })
-        } else {
-            None
-        }
     }
 }
 

@@ -113,14 +113,11 @@ impl NiceOutput {
             font: None,
         };
 
-        let secondary_bit_opt = match &self.secondary_text {
-            Some(t) => Some(Bit {
+        let secondary_bit_opt = self.secondary_text.as_ref().map(|t| Bit {
                 text: t.clone(),
                 color: Some(Color::Other(secondary_color)),
                 font: None,
-            }),
-            None => None,
-        };
+            });
 
         let short_text = format!(
             "{}  {}",
