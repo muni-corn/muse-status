@@ -13,13 +13,27 @@ setup.
 
 # Building
 
-The following (Void Linux) dependencies are required to build `muse-status` and
+The following dependencies are required to build `muse-status` and
 its daemon:
 
 -	pkg-config
 
--	alsa-lib-devel
+-	alsa-lib (development files)
 
--	dbus-devel
+-	dbus (development files)
 
--	openssl-devel
+-	openssl (development files)
+
+# Running
+
+## The `volume` module
+
+requires either `pamixer` or `amixer` to be in your `$PATH`
+
+## The `network` module
+
+requires `ping` and `ip` to be in your `$PATH`
+
+## The `mpris` module
+
+requires `dbus`
