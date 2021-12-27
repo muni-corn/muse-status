@@ -179,6 +179,7 @@ impl Block for VolumeBlock {
     fn update(&mut self) -> Result<(), UpdateError> {
         let mut wait_time_seconds = 1;
         self.current_volume = loop {
+            // try `pamixer` first
             match self.volume_from_pamixer() {
                 Ok(vol) => break vol,
                 Err(_e) => {
@@ -186,6 +187,8 @@ impl Block for VolumeBlock {
                     {
                         eprintln!("{}", _e);
                     }
+
+                    // fallback to `amixer` if there's an error
                     match self.volume_from_amixer() {
                         Ok(vol) => break vol,
                         Err(_e) => {
@@ -198,9 +201,8 @@ impl Block for VolumeBlock {
                 }
             }
 
-            std::thread::sleep(std::time::Duration::from_secs(wait_time_seconds));
-
             // exponential falloff
+            std::thread::sleep(std::time::Duration::from_secs(wait_time_seconds));
             if wait_time_seconds < Self::MAX_WAIT_SECONDS {
                 wait_time_seconds = Self::MAX_WAIT_SECONDS.min(wait_time_seconds * 2);
             }
