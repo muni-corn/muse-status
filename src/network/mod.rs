@@ -5,6 +5,7 @@ use crate::format::Attention;
 use chrono::{DateTime, Local};
 use nl80211::Socket;
 use std::process::Command;
+use std::process::Stdio;
 
 /// A block that transmits wireless interface data.
 pub struct NetworkBlock {
@@ -76,15 +77,23 @@ impl NetworkBlock {
     }
 
     fn packet_loss(&self) -> Result<bool, UpdateError> {
-        let mut ping_cmd = Command::new("ping");
-        ping_cmd.args(&["-c", "2", "-W", "2", "-I", &self.iface_name, "8.8.8.8"]);
+        let ping_cmd_status = Command::new("ping")
+            .arg("-c")
+            .arg("2")
+            .arg("-W")
+            .arg("2")
+            .arg("-I")
+            .arg(&self.iface_name)
+            .arg("8.8.8.8")
+            .stdout(Stdio::null())
+            .status();
 
-        let status = ping_cmd.status().map_err(|e| UpdateError {
+        let is_success = ping_cmd_status.map_err(|e| UpdateError {
             block_name: self.name().to_string(),
             message: format!("couldn't execute `ping`: {}", e),
-        })?;
+        })?.success();
 
-        Ok(!status.success())
+        Ok(!is_success)
     }
 
     fn get_icon(&self) -> char {
