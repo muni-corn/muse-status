@@ -14,8 +14,9 @@
 --- [ ] indicate disconnection from daemon
 
 * enhancements
+  - [ ] client-side animations
+  -- daemon sends animation instructions, client animates
   - [ ] instead of `next_update_time` that returns a datetime, let's do `next_update` that returns an enum:
-
   @code rust
   enum NextUpdate {
     In(Duration)
