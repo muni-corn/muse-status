@@ -14,6 +14,7 @@
   -- [ ] indicate disconnection from daemon
 
 * enhancements
+  - [ ] use features to exclude features for a more lightweight program
   - [ ] client-side animations
   -- daemon sends animation instructions, client animates
   - [ ] instead of `next_update_time` that returns a datetime, let's do `next_update` that returns an enum:
@@ -25,6 +26,9 @@
     @end
 
 * new features
+  - [ ] "privacy" module that displays if any process is monitoring camera or microphone
+  -- [ ] webcam, microphone, or screen sharing icon will slowly pulse the color green if their respective device is in use
+  -- [ ] user can specify which devices to watch
   - [ ] "watch" or "monitor" module (watches processes and displays in bar when they're running)
   - [ ] progress bars
   -- [ ] "sliders" for volume/brightness
