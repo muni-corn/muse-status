@@ -1,39 +1,39 @@
 * modules
--- weather
---- [ ] use geoclue (or manual input) for location
--- battery
---- [ ] inotify watching for updates instead of polling
--- network
---- [ ] detect vpn
---- [ ] detect captive portal
--- date
---- [ ] maybe sleep thread for a maximum of 5 seconds
+  - weather
+  -- [ ] use geoclue (or manual input) for location
+  - battery
+  -- [ ] inotify watching for updates instead of polling
+  - network
+  -- [ ] detect vpn
+  -- [ ] detect captive portal
+  - date
+  -- [ ] maybe sleep thread for a maximum of 5 seconds
 
 * bugs
--- [ ] fix error handling for client
---- [ ] indicate disconnection from daemon
+  - [ ] fix error handling for client
+  -- [ ] indicate disconnection from daemon
 
 * enhancements
   - [ ] client-side animations
   -- daemon sends animation instructions, client animates
   - [ ] instead of `next_update_time` that returns a datetime, let's do `next_update` that returns an enum:
-  @code rust
-  enum NextUpdate {
-    In(Duration)
-    At(DateTime)
-  }
-  @end
-  
+    @code rust
+      enum NextUpdate {
+        In(Duration)
+        At(DateTime)
+      }
+    @end
+
 * new features
--- [ ] "watch" or "monitor" module (watches processes and displays in bar when they're running)
--- [ ] progress bars
---- [ ] "sliders" for volume/brightness
---- [ ] maybe progress bars that can track tasks
--- [ ] banners
---- [ ] large banners (temporarily replace entire bar text with an important notification)
---- [ ] small banners (don't replace entire bar, just display alongside tertiary blocks)
---- [ ] notification daemon
--- [ ] timers/stopwatches
--- [ ] new touchscreen features
---- [ ] interactive volume, brightness sliders
--- [ ] reminders?
+  - [ ] "watch" or "monitor" module (watches processes and displays in bar when they're running)
+  - [ ] progress bars
+  -- [ ] "sliders" for volume/brightness
+  -- [ ] maybe progress bars that can track tasks
+  - [ ] banners
+  -- [ ] large banners (temporarily replace entire bar text with an important notification)
+  -- [ ] small banners (don't replace entire bar, just display alongside tertiary blocks)
+  -- [ ] notification daemon?
+  - [ ] timers/stopwatches
+  - [ ] new touchscreen features
+  -- [ ] interactive volume, brightness sliders
+  - [ ] reminders?
