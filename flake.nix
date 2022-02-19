@@ -13,7 +13,7 @@
           naersk-lib = naersk.lib."${system}";
 
           nativeBuildInputs = with pkgs; [ rustc cargo dbus pkg-config libressl ];
-          buildInputs = with pkgs; [ dbus pamixer alsa-utils ping ];
+          buildInputs = with pkgs; [ dbus pamixer alsa-utils iputils ];
 
           muse-status = naersk-lib.buildPackage {
             pname = "muse-status";
