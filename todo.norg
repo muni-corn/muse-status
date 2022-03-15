@@ -7,7 +7,7 @@
   -- [ ] detect vpn
   -- [ ] detect captive portal
   - date
-  -- [ ] maybe sleep thread for a maximum of 5 seconds
+  -- [x] maybe sleep thread for a maximum of 5 seconds
 
 * bugs
   - [ ] fix error handling for client

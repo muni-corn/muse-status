@@ -1,9 +1,11 @@
-use crate::errors::*;
-use crate::format::blocks::output::*;
-use crate::format::blocks::*;
-use crate::format::Attention;
-use chrono::prelude::*;
-use chrono::{DateTime, Local};
+use crate::{
+    errors::*,
+    format::{
+        blocks::{output::*, *},
+        Attention,
+    },
+};
+use chrono::{prelude::*, DateTime, Duration, Local};
 
 /// The format with which to format time strings.
 pub const TIME_FORMAT: &str = "%-I:%M %P";
@@ -31,12 +33,10 @@ pub struct DateBlock {
 
 impl Default for DateBlock {
     fn default() -> Self {
-        let now = chrono::Local::now();
+        let now = Local::now();
+        let next_update = next_minute_or_five_seconds();
 
-        Self {
-            now,
-            next_update: (now + chrono::Duration::minutes(1)).with_second(0).unwrap(), // don't hate me
-        }
+        Self { now, next_update }
     }
 }
 
@@ -50,10 +50,8 @@ impl DateBlock {
 impl Block for DateBlock {
     /// Updates the clock
     fn update(&mut self) -> Result<(), UpdateError> {
-        self.now = chrono::Local::now();
-        self.next_update = (self.now + chrono::Duration::minutes(1))
-            .with_second(0)
-            .unwrap();
+        self.now = Local::now();
+        self.next_update = get_next_minute();
 
         Ok(())
     }
@@ -80,7 +78,7 @@ impl Block for DateBlock {
 /// Returns a greeting based on the hour of the day
 #[allow(dead_code)]
 fn get_greeting() -> String {
-    let hour = chrono::Local::now().hour();
+    let hour = Local::now().hour();
 
     let greeting = if hour < 12 {
         "Good morning!"
@@ -91,4 +89,20 @@ fn get_greeting() -> String {
     };
 
     String::from(greeting)
+}
+
+/// Returns the time of the next minute of the hour.
+fn get_next_minute() -> DateTime<Local> {
+    let now = Local::now();
+    (now + Duration::minutes(1)).with_second(0).unwrap()
+}
+
+/// Returns a time that is either at the next minute of the hour or in five seconds, whichever
+/// comes first.
+fn next_minute_or_five_seconds() -> DateTime<Local> {
+    let now = Local::now();
+    let next_minute = get_next_minute();
+    let in_five_seconds = now + Duration::seconds(5);
+
+    next_minute.min(in_five_seconds)
 }
