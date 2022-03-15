@@ -124,7 +124,7 @@ impl WeatherBlock {
             Some(l) => {
                 let req_url = format!(
                     "http://api.openweathermap.org/data/2.5/weather?lat={}&lon={}&appid={}&units={}",
-                    l.latitude, l.longitude, self.openweathermap_key, self.units.to_string()
+                    l.latitude, l.longitude, self.openweathermap_key, self.units
                 );
 
                 let text = match reqwest::blocking::get(&req_url) {

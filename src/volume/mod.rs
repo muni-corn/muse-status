@@ -191,10 +191,10 @@ impl Block for VolumeBlock {
                     // fallback to `amixer` if there's an error
                     match self.volume_from_amixer() {
                         Ok(vol) => break vol,
-                        Err(_e) => {
+                        Err(_e1) => {
                             #[cfg(debug_assertions)]
                             {
-                                eprintln!("{}", _e);
+                                eprintln!("{}", _e1);
                             }
                         }
                     }

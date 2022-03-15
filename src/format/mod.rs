@@ -334,8 +334,8 @@ impl Formatter {
     }
 
     /// Formats the BlockOutput for the i3 JSON protocol. None if body is None.
-    fn block_output_as_json_protocol_string(&self, b: &BlockOutput) -> Option<String> {
-        if let Some(body) = &b.body {
+    fn block_output_as_json_protocol_string(&self, block_output: &BlockOutput) -> Option<String> {
+        if let Some(body) = &block_output.body {
             let (full_text, short_text) = match body {
                 BlockOutputContent::Nice(n) => n.as_pango_strings(self),
                 BlockOutputContent::SingleBit(b) => {
@@ -350,7 +350,7 @@ impl Formatter {
                 short_text,
                 separator: true,
                 markup: String::from("pango"),
-                name: b.block_name.clone(),
+                name: block_output.block_name.clone(),
             };
 
             match serde_json::to_string(&json) {
@@ -363,8 +363,8 @@ impl Formatter {
     }
 
     /// Formats the BlockOutput for plain markup output.
-    fn block_output_as_markup(&self, b: &BlockOutput) -> Option<String> {
-        b.body.as_ref().map(|body| match body {
+    fn block_output_as_markup(&self, block_output: &BlockOutput) -> Option<String> {
+        block_output.body.as_ref().map(|body| match body {
             BlockOutputContent::Nice(n) => n.as_pango_strings(self).0,
             BlockOutputContent::SingleBit(b) => b.as_pango_string(self),
             BlockOutputContent::Custom(c) => c.clone(),

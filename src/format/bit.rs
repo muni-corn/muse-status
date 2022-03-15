@@ -29,11 +29,11 @@ impl Bit {
     }
 
     /// Formats the Bit as a pango string.
-    pub fn as_pango_string(&self, f: &Formatter) -> String {
+    pub fn as_pango_string(&self, fmt: &Formatter) -> String {
         let escaped = xml_escape(&self.text);
         match &self.color {
             Some(c) => {
-                let rgba = f.color_to_rgba(c);
+                let rgba = fmt.color_to_rgba(c);
                 match &self.font {
                     Some(f) => format!(
                         r##"<span color='#{}' font_desc='{}'>{}</span>"##,

@@ -51,8 +51,8 @@ pub trait Block: Send + Sync {
                 };
 
                 let now = chrono::Local::now();
-                if let Some(d) = next_update_time {
-                    let duration = if let Ok(d) = (d - now).to_std() {
+                if let Some(next) = next_update_time {
+                    let duration = if let Ok(d) = (next - now).to_std() {
                         d
                     } else {
                         std::time::Duration::from_secs(5)
