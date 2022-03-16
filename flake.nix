@@ -3,17 +3,29 @@
     flake-utils.url = "github:numtide/flake-utils";
     naersk.url = "github:nix-community/naersk";
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
-  outputs = { self, nixpkgs, flake-utils, naersk }:
+  outputs = { self, nixpkgs, flake-utils, naersk, rust-overlay }:
     let allSystems =
       flake-utils.lib.eachDefaultSystem (
         system:
         let
-          pkgs = nixpkgs.legacyPackages."${system}";
+          overlays = [ (import rust-overlay) ];
+          pkgs = import nixpkgs {
+            inherit system overlays;
+            config = { allowUnfree = true; };
+          };
           naersk-lib = naersk.lib."${system}";
 
-          nativeBuildInputs = with pkgs; [ rustc cargo dbus pkg-config libressl ];
+          nativeBuildInputs = with pkgs; [
+            rust-bin.nightly.latest.default
+            rustc
+            cargo
+            dbus
+            pkg-config
+            libressl
+          ];
           buildInputs = with pkgs; [ dbus pamixer alsa-utils iputils ];
 
           muse-status = naersk-lib.buildPackage {
