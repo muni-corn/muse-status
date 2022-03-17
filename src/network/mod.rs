@@ -254,7 +254,7 @@ impl Block for NetworkBlock {
                 Some(BlockOutputContent::from(NiceOutput {
                     attention: Attention::Normal,
                     icon,
-                    primary_text: self.ssid.clone().unwrap_or_else(String::new),
+                    primary_text: self.ssid.clone().unwrap_or_default(),
                     secondary_text: self.status.to_string(),
                 }))
             }

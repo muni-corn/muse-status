@@ -175,7 +175,7 @@ impl Block for MprisBlock {
         match self.status {
             PlayerStatus::Stopped => None,
             _ => Some(BlockOutputContent::from(NiceOutput {
-                primary_text: self.title.clone().unwrap_or_else(String::new),
+                primary_text: self.title.clone().unwrap_or_default(),
                 secondary_text: self.artist.clone(),
                 icon: self.get_icon(),
                 attention: Attention::Normal,
