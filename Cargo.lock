@@ -718,7 +718,6 @@ dependencies = [
  "nl80211",
  "regex",
  "reqwest",
- "retain_mut",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1088,12 +1087,6 @@ dependencies = [
  "web-sys",
  "winreg",
 ]
-
-[[package]]
-name = "retain_mut"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11000e6ba5020e53e7cc26f73b91ae7d5496b4977851479edb66b694c0675c21"
 
 [[package]]
 name = "rustc-demangle"

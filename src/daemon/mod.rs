@@ -7,7 +7,6 @@ use crate::{
         blocks::{output::BlockOutput, Block},
     },
 };
-use retain_mut::RetainMut;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{
