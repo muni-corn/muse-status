@@ -2,7 +2,7 @@ use crate::errors::*;
 use crate::format::blocks::output::*;
 use crate::format::blocks::*;
 use crate::format::Attention;
-use chrono::{DateTime, Local};
+use chrono::Duration;
 use nl80211::Socket;
 use std::process::Command;
 use std::process::Stdio;
@@ -21,8 +21,6 @@ pub struct NetworkBlock {
     disconnected_icon: char,
     disabled_icon: char,
     unknown_icon: char,
-
-    next_update_time: DateTime<Local>,
 }
 
 impl Default for NetworkBlock {
@@ -58,8 +56,6 @@ impl Default for NetworkBlock {
             disconnected_icon: '\u{F092F}',
             disabled_icon: '\u{F092E}',
             unknown_icon: '\u{F092B}',
-
-            next_update_time: Local::now(),
         }
     }
 }
@@ -69,7 +65,6 @@ impl NetworkBlock {
     pub fn new(iface_name: &str) -> Result<Self, MuseStatusError> {
         let block = Self {
             iface_name: String::from(iface_name),
-            next_update_time: Local::now() + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS),
             ..Default::default()
         };
 
@@ -197,9 +192,6 @@ impl Block for NetworkBlock {
 
     // Updates the network information
     fn update(&mut self) -> Result<(), UpdateError> {
-        self.next_update_time =
-            chrono::Local::now() + chrono::Duration::seconds(UPDATE_INTERVAL_SECONDS);
-
         self.update_status()?;
 
         match self.status {
@@ -235,8 +227,8 @@ impl Block for NetworkBlock {
         Ok(())
     }
 
-    fn next_update_time(&self) -> Option<DateTime<Local>> {
-        Some(self.next_update_time)
+    fn next_update(&self) -> Option<NextUpdate> {
+        Some(NextUpdate::In(Duration::seconds(UPDATE_INTERVAL_SECONDS)))
     }
 
     fn output(&self) -> Option<BlockOutputContent> {
