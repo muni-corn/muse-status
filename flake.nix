@@ -14,18 +14,23 @@
           overlays = [ (import rust-overlay) ];
           pkgs = import nixpkgs {
             inherit system overlays;
-            config = { allowUnfree = true; };
           };
-          naersk-lib = naersk.lib."${system}";
 
-          nativeBuildInputs = with pkgs; [
-            rust-bin.nightly.latest.default
-            rustc
-            cargo
-            dbus
-            pkg-config
-            libressl
-          ];
+          rust = pkgs.rust-bin.nightly.latest.default;
+
+          naersk-lib = naersk.lib."${system}".override {
+            cargo = rust;
+            rustc = rust;
+          };
+
+          nativeBuildInputs = builtins.attrValues {
+            inherit rust;
+
+            inherit (pkgs)
+              dbus
+              pkg-config
+              libressl;
+          };
           buildInputs = with pkgs; [ dbus pamixer alsa-utils iputils ];
 
           muse-status = naersk-lib.buildPackage {
