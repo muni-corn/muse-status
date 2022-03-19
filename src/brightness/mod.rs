@@ -84,7 +84,7 @@ impl Block for BrightnessBlock {
         Ok(())
     }
 
-    fn next_update_time(&self) -> Option<chrono::DateTime<chrono::Local>> {
+    fn next_update(&self) -> Option<NextUpdate> {
         None
     }
 
