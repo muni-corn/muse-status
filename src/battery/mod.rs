@@ -81,15 +81,12 @@ pub struct BatteryBlock {
 
     current_read: Option<BatteryRead>,
     last_read: Option<BatteryRead>,
-
-    next_update_time: DateTime<Local>,
 }
 
 impl BatteryBlock {
     /// Returns a new block with the configuration provided.
     pub fn new(config: BatteryConfig) -> Self {
         let battery = config.battery_id;
-        let next_update_time = Local::now() + Duration::minutes(1);
         Self {
             warning_level: config.warning_level,
             alarm_level: config.alarm_level,
@@ -105,8 +102,6 @@ impl BatteryBlock {
 
             current_read: None,
             last_read: None,
-
-            next_update_time,
         }
     }
 
@@ -340,9 +335,6 @@ impl Block for BatteryBlock {
     }
 
     fn update(&mut self) -> Result<(), UpdateError> {
-        let now = Local::now();
-        self.next_update_time = now + Duration::seconds(5);
-
         // update the max charge, if it changes, which I'm pretty sure it does tbh
         // (only update if no error)
         match self.update_battery_charge_max() {
@@ -392,8 +384,8 @@ impl Block for BatteryBlock {
         Ok(())
     }
 
-    fn next_update_time(&self) -> Option<chrono::DateTime<chrono::Local>> {
-        Some(self.next_update_time)
+    fn next_update(&self) -> Option<NextUpdate> {
+        Some(NextUpdate::In(Duration::seconds(5)))
     }
 }
 
