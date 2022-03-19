@@ -9,6 +9,7 @@ use std::{
         Arc, Mutex,
     },
     thread::{self, JoinHandle},
+    time,
 };
 
 pub use output::{BlockOutput, BlockOutputContent};
@@ -47,10 +48,11 @@ pub trait Block: Send + Sync {
         // clone the sender
         let output_sender_clone = block_sender.clone();
 
+        // start block auto-updating loop
         let loop_handle = thread::Builder::new()
             .name(loop_thread_name)
             .spawn(move || loop {
-                let next_update_time = {
+                let next_update_opt = {
                     let mut block = block_arc_mutex.lock().unwrap();
 
                     // update and update the bar
@@ -59,24 +61,27 @@ pub trait Block: Send + Sync {
                     }
                     let _ = block_sender.send(BlockOutput::new(block.name(), block.output()));
 
-                    block.next_update_time()
+                    block.next_update()
                 };
 
-                let now = chrono::Local::now();
-                if let Some(next) = next_update_time {
-                    let duration = if let Ok(d) = (next - now).to_std() {
-                        d
-                    } else {
-                        std::time::Duration::from_secs(5)
+                if let Some(next_update) = next_update_opt {
+                    let chrono_duration = match next_update {
+                        NextUpdate::At(date_time) => {
+                            let now = Local::now();
+                            date_time - now
+                        },
+                        NextUpdate::In(duration) => duration,
                     };
 
-                    thread::sleep(duration);
+                    let std_duration = chrono_duration.to_std().unwrap_or(time::Duration::from_secs(5));
+                    thread::sleep(std_duration);
                 } else {
                     break;
                 }
             })
             .unwrap();
 
+        // listen for update requests
         let notify_listen_handle = thread::Builder::new()
             .name(notify_listener_thread_name)
             .spawn(move || {
