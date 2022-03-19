@@ -24,13 +24,13 @@ pub enum NextUpdate {
 
 /// Block is a piece of data in the status bar.
 pub trait Block: Send + Sync {
-    /// Runs the block asynchronously. The tuple returns (1) a Vec of JoinHandles to any threads
-    /// started asynchronously and (2) a Sender that will send notification query to force an
+    /// Runs the block asynchronously. The tuple returns (1) a `Vec` of `JoinHandle`s to any threads
+    /// started asynchronously and (2) a `Sender` that will send notification query to force an
     /// update on blocks (via `muse-status notify <block-name>`).
     ///
-    /// About the returned Sender: If a request to notify blocks is sent, the Sender sends the
-    /// block name specified (or whatever string is sent through). The Block, which should be
-    /// listening with a partnered Receiver in a different thread, can handle this data as it
+    /// About the returned `Sender`: If a request to notify blocks is sent, the `Sender` sends the
+    /// block name specified (or whatever string is sent through). The `Block`, which should be
+    /// listening with a partnered `Receiver` in a different thread, can handle this data as it
     /// pleases.
     fn run(self: Box<Self>, block_sender: Sender<BlockOutput>) -> (Vec<JoinHandle<()>>, Sender<()>)
     where
