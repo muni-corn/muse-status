@@ -60,8 +60,8 @@ impl Block for DateBlock {
         "date"
     }
 
-    fn next_update_time(&self) -> Option<DateTime<Local>> {
-        Some(self.next_update)
+    fn next_update(&self) -> Option<NextUpdate> {
+        Some(NextUpdate::At(self.next_update))
     }
 
     fn output(&self) -> Option<BlockOutputContent> {
