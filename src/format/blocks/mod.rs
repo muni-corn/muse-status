@@ -1,15 +1,17 @@
 /// A module for block outputs.
 pub mod output;
 
-use crate::errors::UpdateError;
-use crate::format;
-use chrono::{Duration, DateTime, Local};
+use crate::{errors::UpdateError, format};
+use chrono::{DateTime, Duration, Local};
+use std::{
+    sync::{
+        mpsc::{self, Sender},
+        Arc, Mutex,
+    },
+    thread::{self, JoinHandle},
+};
+
 pub use output::{BlockOutput, BlockOutputContent};
-use std::sync::mpsc;
-use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::thread::JoinHandle;
 
 /// Represents when or in how much time the next update of a block should occur.
 pub enum NextUpdate {
@@ -99,7 +101,7 @@ pub trait Block: Send + Sync {
 
     /// The next time at which the block will update, if any. If None, the block will immediately
     /// stop polling/updating automatically.
-    fn next_update_time(&self) -> Option<chrono::DateTime<chrono::Local>>;
+    fn next_update(&self) -> Option<NextUpdate>;
 
     /// Output returns Some BlockOutputBody, or None. If None, the Block is hidden from the status
     /// bar. If Some, the block is updated in the status bar.
