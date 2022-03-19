@@ -1,6 +1,6 @@
 use crate::errors::*;
 use crate::format::blocks::output::{BlockOutput, BlockOutputContent, NiceOutput};
-use crate::format::blocks::Block;
+use crate::format::blocks::{Block, NextUpdate};
 use crate::format::Attention;
 use mpris as mpris_lib;
 use std::sync::mpsc::Sender;
@@ -10,8 +10,6 @@ use std::thread::JoinHandle;
 
 /// A block that displays information about any media currently playing on the device.
 pub struct MprisBlock {
-    next_update_time: chrono::DateTime<chrono::Local>,
-
     playing_icon: char,
     paused_icon: char,
 
@@ -23,7 +21,6 @@ pub struct MprisBlock {
 impl Default for MprisBlock {
     fn default() -> Self {
         MprisBlock {
-            next_update_time: chrono::Local::now() + chrono::Duration::seconds(5),
             playing_icon: '\u{F0F74}',
             paused_icon: '\u{F03E4}',
 
@@ -167,8 +164,8 @@ impl Block for MprisBlock {
         "mpris"
     }
 
-    fn next_update_time(&self) -> Option<chrono::DateTime<chrono::Local>> {
-        Some(self.next_update_time)
+    fn next_update(&self) -> Option<NextUpdate> {
+        Some(NextUpdate::In(chrono::Duration::seconds(5)))
     }
 
     fn output(&self) -> Option<BlockOutputContent> {
