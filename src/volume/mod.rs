@@ -1,6 +1,6 @@
 use crate::errors::*;
 use crate::format::blocks::output::{BlockOutputContent, NiceOutput};
-use crate::format::blocks::Block;
+use crate::format::blocks::{Block, NextUpdate};
 use crate::format::Attention;
 use std::process;
 
@@ -215,7 +215,7 @@ impl Block for VolumeBlock {
         "volume"
     }
 
-    fn next_update_time(&self) -> Option<chrono::DateTime<chrono::Local>> {
+    fn next_update(&self) -> Option<NextUpdate> {
         None
     }
 
