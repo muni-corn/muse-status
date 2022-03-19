@@ -3,12 +3,22 @@ pub mod output;
 
 use crate::errors::UpdateError;
 use crate::format;
+use chrono::{Duration, DateTime, Local};
 pub use output::{BlockOutput, BlockOutputContent};
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
+
+/// Represents when or in how much time the next update of a block should occur.
+pub enum NextUpdate {
+    /// The next update occurs after the specified duration.
+    In(Duration),
+
+    /// The next update occurs at a specified time.
+    At(DateTime<Local>),
+}
 
 /// Block is a piece of data in the status bar.
 pub trait Block: Send + Sync {
