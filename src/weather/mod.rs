@@ -257,5 +257,5 @@ impl Block for WeatherBlock {
 /// Returns the external, public IP address of this device. The address is used to find the
 /// device's current location.
 pub fn get_external_ip() -> Result<String, MuseStatusError> {
-    Ok(reqwest::blocking::get("http://checkip.amazonaws.com")?.text()?)
+    Ok(reqwest::blocking::get("http://ifconfig.me")?.text()?)
 }
