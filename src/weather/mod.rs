@@ -4,11 +4,11 @@ use crate::{
     config::WeatherConfig,
     errors::*,
     format::{
-        blocks::{output::*, Block},
+        blocks::{output::*, Block, NextUpdate},
         Attention,
     },
 };
-use chrono::Local;
+use chrono::Duration;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -47,8 +47,6 @@ pub struct WeatherBlock {
     units: Units,
 
     update_interval_minutes: u32,
-
-    next_update_time: chrono::DateTime<chrono::Local>,
 }
 
 impl Default for WeatherBlock {
@@ -70,8 +68,6 @@ impl WeatherBlock {
 
             current_report: None,
             location: None,
-            next_update_time: Local::now()
-                + chrono::Duration::minutes(config.update_interval_minutes as i64),
         }
     }
 
@@ -226,9 +222,6 @@ impl Block for WeatherBlock {
             }
         }
 
-        self.next_update_time =
-            Local::now() + chrono::Duration::minutes(self.update_interval_minutes as i64);
-
         Ok(())
     }
 
@@ -249,8 +242,8 @@ impl Block for WeatherBlock {
         })
     }
 
-    fn next_update_time(&self) -> Option<chrono::DateTime<chrono::Local>> {
-        Some(self.next_update_time)
+    fn next_update(&self) -> Option<NextUpdate> {
+        Some(NextUpdate::In(Duration::minutes(self.update_interval_minutes.into())))
     }
 }
 
