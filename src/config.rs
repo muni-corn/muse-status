@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs::File, path::Path, path::PathBuf};
 
 /// Configuration for all of muse-status.
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Config {
     /// The TCP address to run and listen on.
@@ -89,7 +89,7 @@ impl Config {
 }
 
 /// Configuration for a battery information struct.
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct BatteryConfig {
     /// The name of the battery in Linux's /sys/class/power_supply/ directory.
@@ -113,7 +113,7 @@ impl Default for BatteryConfig {
 }
 
 /// Configuration for a weather information block.
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct WeatherConfig {
     /// API key for OpenWeatherMap, which, ya know, gets weather information.

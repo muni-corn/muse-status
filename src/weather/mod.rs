@@ -15,7 +15,7 @@ use std::fmt;
 use structs::*;
 
 /// Type of units to use when reporting locale-specific measurements.
-#[derive(Clone, Copy, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Units {
     /// Freedom units.

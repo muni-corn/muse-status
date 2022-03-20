@@ -24,6 +24,11 @@ fn main() {
         config::Config::from_file(path).unwrap()
     };
 
+    #[cfg(debug_assertions)]
+    {
+        eprintln!("daemon config: {:?}", config);
+    }
+
     let battery_block = battery::BatteryBlock::new(config.battery_config.clone());
     let brightness_block = brightness::BrightnessBlock::new(&config.brightness_id);
     let date_block = date::DateBlock::new();
