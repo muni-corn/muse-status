@@ -10,7 +10,6 @@ use crate::{
 };
 use chrono::Duration;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fmt;
 use structs::*;
 
@@ -37,16 +36,10 @@ impl fmt::Display for Units {
 /// WeatherBlock returns information about the weather around the user's current location.
 /// OpenWeatherMap and IPStack are used for weather and location respectively.
 pub struct WeatherBlock {
-    openweathermap_key: String,
-    ipstack_key: String,
-    weather_icons: HashMap<String, char>,
-    default_icon: char,
+    config: WeatherConfig,
 
     current_report: Option<FullWeatherReport>,
     location: Option<WeatherLocation>,
-    units: Units,
-
-    update_interval_minutes: u32,
 }
 
 impl Default for WeatherBlock {
@@ -59,12 +52,7 @@ impl WeatherBlock {
     /// Creates a new weather block.
     pub fn new(config: WeatherConfig) -> Self {
         Self {
-            openweathermap_key: config.openweathermap_key,
-            ipstack_key: config.ipstack_key,
-            weather_icons: config.weather_icons,
-            update_interval_minutes: config.update_interval_minutes,
-            default_icon: config.default_icon,
-            units: config.units,
+            config,
 
             current_report: None,
             location: None,
@@ -85,7 +73,7 @@ impl WeatherBlock {
 
         let url = format!(
             "http://api.ipstack.com/{}?access_key={}&format=1",
-            ip, self.ipstack_key
+            ip, self.config.ipstack_key
         );
 
         let res = reqwest::blocking::get(&url)?;
@@ -101,9 +89,9 @@ impl WeatherBlock {
     fn get_weather_icon(&self, report: &FullWeatherReport) -> char {
         if let Some(r) = report.weather.get(0) {
             let icon_string = &r.icon;
-            self.weather_icons[icon_string]
+            self.config.weather_icons[icon_string]
         } else {
-            self.default_icon
+            self.config.default_icon
         }
     }
 
@@ -120,7 +108,7 @@ impl WeatherBlock {
             Some(l) => {
                 let req_url = format!(
                     "http://api.openweathermap.org/data/2.5/weather?lat={}&lon={}&appid={}&units={}",
-                    l.latitude, l.longitude, self.openweathermap_key, self.units
+                    l.latitude, l.longitude, self.config.openweathermap_key, self.config.units
                 );
 
                 let text = match reqwest::blocking::get(&req_url) {
@@ -216,9 +204,9 @@ impl Block for WeatherBlock {
 
             std::thread::sleep(std::time::Duration::from_secs(wait_time_seconds));
 
-            if wait_time_seconds < self.update_interval_minutes as u64 * 60 {
+            if wait_time_seconds < self.config.update_interval_minutes as u64 * 60 {
                 wait_time_seconds =
-                    (wait_time_seconds * 2).min(self.update_interval_minutes as u64 * 60);
+                    (wait_time_seconds * 2).min(self.config.update_interval_minutes as u64 * 60);
             }
         }
 
@@ -243,7 +231,7 @@ impl Block for WeatherBlock {
     }
 
     fn next_update(&self) -> Option<NextUpdate> {
-        Some(NextUpdate::In(Duration::minutes(self.update_interval_minutes.into())))
+        Some(NextUpdate::In(Duration::minutes(self.config.update_interval_minutes.into())))
     }
 }
 
