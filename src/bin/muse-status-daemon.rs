@@ -40,7 +40,11 @@ fn main() {
         }
     };
     let mpris_block = mpris::MprisBlock::new();
-    let volume_block = volume::VolumeBlock::new();
+    let volume_block = if let Some(sink) = &config.volume_sink {
+        volume::VolumeBlock::new(sink)
+    } else {
+        volume::VolumeBlock::default()
+    };
     let weather_block = weather::WeatherBlock::new(config.weather_config.clone());
 
     let blocks: Vec<Box<dyn Block>> = vec![

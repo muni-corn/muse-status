@@ -2,7 +2,7 @@ use crate::errors::*;
 use crate::format::blocks::output::{BlockOutputContent, NiceOutput};
 use crate::format::blocks::{Block, NextUpdate};
 use crate::format::Attention;
-use std::process;
+use std::process::Command;
 
 /// Enums are great
 #[derive(Debug, Eq, PartialEq)]
@@ -23,21 +23,40 @@ impl Default for Volume {
 /// VolumeBlock provides information for the system's audio volume. Requires `amixer`.
 #[derive(Default)]
 pub struct VolumeBlock {
+    volume_sink: Option<String>,
     current_volume: Volume,
 }
 
 impl VolumeBlock {
-    /// Returns a new VolumeBlock. By default, it gets info for the Master bus via `amixer`.
-    pub fn new() -> Self {
-        Default::default()
+    /// Returns a new VolumeBlock which uses the specified sink.
+    pub fn new(volume_sink: &str) -> Self {
+        Self {
+            volume_sink: Some(volume_sink.to_string()),
+            ..Default::default()
+        }
     }
 
     const MAX_WAIT_SECONDS: u64 = 30;
 
     /// Gets the system volume from the `pamixer` command
     fn volume_from_pamixer(&self) -> Result<Volume, UpdateError> {
-        let muted = process::Command::new("pamixer")
-            .args(&["--get-mute"])
+        let mut get_mute_command_args = vec!["--get-mute"];
+        if let Some(sink) = &self.volume_sink {
+            #[cfg(debug_assertions)]
+            {
+                eprintln!("getting mute from sink '{}'", sink);
+            }
+            get_mute_command_args.push("--sink");
+            get_mute_command_args.push(sink);
+        } else {
+            #[cfg(debug_assertions)]
+            {
+                eprintln!("getting mute from default sink");
+            }
+        }
+
+        let muted = Command::new("pamixer")
+            .args(&get_mute_command_args)
             .output()
             .map(|output| {
                 String::from_utf8(output.stdout).map(|b| {
@@ -64,8 +83,23 @@ impl VolumeBlock {
         if muted {
             Ok(Volume::Off)
         } else {
-            let num = process::Command::new("pamixer")
-                .args(&["--get-volume"])
+            let mut get_volume_command_args = vec!["--get-volume"];
+            if let Some(sink) = &self.volume_sink {
+                #[cfg(debug_assertions)]
+                {
+                    eprintln!("getting volume from sink '{}'", sink);
+                }
+                get_volume_command_args.push("--sink");
+                get_volume_command_args.push(sink);
+            } else {
+                #[cfg(debug_assertions)]
+                {
+                    eprintln!("getting volume from default sink");
+                }
+            }
+
+            let num = Command::new("pamixer")
+                .args(&get_volume_command_args)
                 .output()
                 .map(|output| {
                     String::from_utf8(output.stdout).map(|num| {
@@ -95,7 +129,7 @@ impl VolumeBlock {
 
     /// Gets the system volume from the `amixer` command
     fn volume_from_amixer(&self) -> Result<Volume, UpdateError> {
-        let raw_string_opt = process::Command::new("amixer")
+        let raw_string_opt = Command::new("amixer")
             .args(&["sget", "Master"])
             .output()
             .map(|output| {

@@ -21,6 +21,10 @@ pub struct Config {
     /// The name of the brightness directory in Linux's /sys/class/backlight directory.
     pub brightness_id: String,
 
+    /// The audio sink to use for the volume block.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub volume_sink: Option<String>,
+
     /// The name of the user's network interface (like `wlan0`).
     pub network_interface_name: String,
 
@@ -50,6 +54,7 @@ impl Default for Config {
 
             brightness_id: String::from("amdgpu_bl0"),
             network_interface_name: String::from("wlan0"),
+            volume_sink: None,
 
             battery_config: Default::default(),
             weather_config: Default::default(),
