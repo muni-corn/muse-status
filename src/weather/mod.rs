@@ -10,7 +10,6 @@ use crate::{
 };
 use chrono::Duration;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use structs::*;
 
 /// Type of units to use when reporting locale-specific measurements.
@@ -24,11 +23,11 @@ pub enum Units {
     Metric,
 }
 
-impl fmt::Display for Units {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Units {
+    fn as_str(&self) -> &'static str {
         match self {
-            Self::Imperial => write!(f, "imperial"),
-            Self::Metric => write!(f, "metric"),
+            Self::Imperial => "imperial",
+            Self::Metric => "metric",
         }
     }
 }
@@ -108,7 +107,7 @@ impl WeatherBlock {
             Some(l) => {
                 let req_url = format!(
                     "http://api.openweathermap.org/data/2.5/weather?lat={}&lon={}&appid={}&units={}",
-                    l.latitude, l.longitude, self.config.openweathermap_key, self.config.units
+                    l.latitude, l.longitude, self.config.openweathermap_key, self.config.units.as_str()
                 );
 
                 let text = match reqwest::blocking::get(&req_url) {
