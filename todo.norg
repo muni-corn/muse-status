@@ -35,10 +35,13 @@
     @end
 
 * new features
-  - [ ] "privacy" module that displays if any process is monitoring camera or microphone
-  -- [ ] webcam, microphone, or screen sharing icon will slowly pulse the color green if their respective device is in use
-  -- [ ] user can specify which devices to watch
-  - [ ] "watch" or "monitor" module (watches processes and displays in bar when they're running)
+  - new modules
+  -- [ ] "utilization" module that tracks cpu, gpu, and memory utilization
+  -- [ ] "temperature" module that tracks cpu and gpu temperature
+  -- [ ] "privacy" module that displays if any process is monitoring camera or microphone
+  --- [ ] webcam, microphone, or screen sharing icon will slowly pulse the color green if their respective device is in use
+  --- [ ] user can specify which devices to watch
+  -- [ ] "watch" or "monitor" module (watches processes and displays in bar when they're running)
   - [ ] progress bars
   -- [ ] "sliders" for volume/brightness
   -- [ ] maybe progress bars that can track tasks
