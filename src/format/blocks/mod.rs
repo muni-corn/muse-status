@@ -12,7 +12,7 @@ use std::{
     time,
 };
 
-pub use output::{BlockOutput, BlockOutputContent};
+pub use output::BlockOutput;
 
 /// Represents when or in how much time the next update of a block should occur.
 pub enum NextUpdate {
@@ -110,7 +110,7 @@ pub trait Block: Send + Sync {
 
     /// Output returns Some BlockOutputBody, or None. If None, the Block is hidden from the status
     /// bar. If Some, the block is updated in the status bar.
-    fn output(&self) -> Option<BlockOutputContent>;
+    fn output(&self) -> Option<BlockOutput>;
 
     /// Returns the name of the block, which is used as a sort of key in the status bar. It's used
     /// to update blocks in the status bar.

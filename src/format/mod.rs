@@ -11,7 +11,7 @@ pub mod color;
 
 use crate::daemon::DataPayload;
 use crate::errors::{BasicError, MuseStatusError};
-use crate::format::blocks::output::{BlockOutput, BlockOutputContent};
+use crate::format::blocks::output::BlockOutput;
 use crate::utils;
 use color::{Color, RGBA};
 use serde::{Deserialize, Serialize};
@@ -231,16 +231,14 @@ impl Formatter {
                             .iter()
                             .chain(secondary.iter().chain(primary.iter()))
                         {
-                            if let Some(jps) = self.block_output_as_markup(block_output) {
-                                markup_strings.push(jps)
-                            }
+                            let markup_string = self.block_output_as_markup(block_output);
+                            markup_strings.push(markup_string);
                         }
                     }
                     DataPayload::Unranked(outputs) => {
                         for block_output in outputs {
-                            if let Some(jps) = self.block_output_as_markup(&block_output) {
-                                markup_strings.push(jps)
-                            }
+                            let markup_string = self.block_output_as_markup(&block_output);
+                            markup_strings.push(markup_string);
                         }
                     }
                 }
@@ -335,40 +333,26 @@ impl Formatter {
 
     /// Formats the BlockOutput for the i3 JSON protocol. None if body is None.
     fn block_output_as_json_protocol_string(&self, block_output: &BlockOutput) -> Option<String> {
-        if let Some(body) = &block_output.body {
-            let (full_text, short_text) = match body {
-                BlockOutputContent::Nice(n) => n.as_pango_strings(self),
-                BlockOutputContent::SingleBit(b) => {
-                    let pango = b.as_pango_string(self);
-                    (pango.clone(), pango)
-                }
-                BlockOutputContent::Custom(c) => (c.clone(), c.clone()),
-            };
+        let (full_text, short_text) = block_output.as_pango_strings(self);
 
-            let json = JsonBlock {
-                full_text,
-                short_text,
-                separator: true,
-                markup: String::from("pango"),
-                name: block_output.block_name.clone(),
-            };
+        let json = JsonBlock {
+            full_text,
+            short_text,
+            separator: true,
+            markup: String::from("pango"),
+            name: block_output.name(),
+        };
 
-            match serde_json::to_string(&json) {
-                Ok(s) => Some(s),
-                Err(_) => None,
-            }
-        } else {
-            None
+        match serde_json::to_string(&json) {
+            Ok(s) => Some(s),
+            Err(_) => None,
         }
     }
 
     /// Formats the BlockOutput for plain markup output.
-    fn block_output_as_markup(&self, block_output: &BlockOutput) -> Option<String> {
-        block_output.body.as_ref().map(|body| match body {
-            BlockOutputContent::Nice(n) => n.as_pango_strings(self).0,
-            BlockOutputContent::SingleBit(b) => b.as_pango_string(self),
-            BlockOutputContent::Custom(c) => c.clone(),
-        })
+    fn block_output_as_markup(&self, block_output: &BlockOutput) -> String {
+        // return only the long format
+        block_output.as_pango_strings(self).0
     }
 }
 
