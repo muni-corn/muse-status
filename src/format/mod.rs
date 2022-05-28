@@ -44,6 +44,31 @@ pub enum Attention {
     AlarmPulse,
 }
 
+impl Attention {
+    /// Returns the colors associated with this `Attention`. The two colors returned are the
+    /// primary and secondary colors, respectively.
+    pub fn colors(&self, f: &Formatter) -> (RGBA, RGBA) {
+        match self {
+            Self::Normal => (f.primary_color.clone(), f.secondary_color.clone()),
+            Self::Dim => (f.secondary_color.clone(), f.secondary_color.clone()),
+            Self::Warning => (f.warning_color.clone(), f.warning_color.clone()),
+            Self::Alarm => (f.alarm_color.clone(), f.alarm_color.clone()),
+            Self::WarningPulse => {
+                // TODO
+                // let c = f.get_warn_pulse_color();
+                // (c.clone(), c)
+                (f.warning_color.clone(), f.warning_color.clone())
+            }
+            Self::AlarmPulse => {
+                // TODO
+                // let c = f.get_alarm_pulse_color();
+                // (c.clone(), c)
+                (f.alarm_color.clone(), f.alarm_color.clone())
+            }
+        }
+    }
+}
+
 /// For different types of status modes, for different status bars that parse information
 /// differently
 #[derive(PartialEq)]

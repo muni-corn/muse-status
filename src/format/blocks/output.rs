@@ -32,24 +32,7 @@ impl BlockOutput {
     /// icon, primary text, and secondary text. The second string is the same but excludes the
     /// secondary text.
     pub fn as_pango_strings(&self, f: &Formatter) -> (String, String) {
-        let (primary_color, secondary_color) = match &self.attention {
-            Attention::Normal => (f.primary_color.clone(), f.secondary_color.clone()),
-            Attention::Dim => (f.secondary_color.clone(), f.secondary_color.clone()),
-            Attention::Warning => (f.warning_color.clone(), f.warning_color.clone()),
-            Attention::Alarm => (f.alarm_color.clone(), f.alarm_color.clone()),
-            Attention::WarningPulse => {
-                // TODO
-                // let c = f.get_warn_pulse_color();
-                // (c.clone(), c)
-                (f.warning_color.clone(), f.warning_color.clone())
-            }
-            Attention::AlarmPulse => {
-                // TODO
-                // let c = f.get_alarm_pulse_color();
-                // (c.clone(), c)
-                (f.alarm_color.clone(), f.alarm_color.clone())
-            }
-        };
+        let (primary_color, secondary_color) = self.attention.colors(f);
 
         let icon_bit_opt = self.icon.map(|icon| Bit {
             text: icon.to_string(),
