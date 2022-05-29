@@ -61,7 +61,7 @@ pub trait Block: Send + Sync {
     /// block name specified (or whatever string is sent through). The `Block`, which should be
     /// listening with a partnered `Receiver` in a different thread, can handle this data as it
     /// pleases.
-    fn run(self: Box<Self>, block_sender: Sender<BlockOutput>) -> (Vec<JoinHandle<()>>, Sender<()>)
+    fn run(self: Box<Self>, block_sender: Sender<BlockOutputMsg>) -> (Vec<JoinHandle<()>>, Sender<()>)
     where
         Self: 'static,
     {
@@ -87,7 +87,7 @@ pub trait Block: Send + Sync {
                     if let Err(e) = block.update() {
                         println!("{}", e)
                     }
-                    let _ = block_sender.send(BlockOutput::new(block.name(), block.output()));
+                    let _ = block_sender.send(BlockOutputMsg::new(block.name(),block.output()));
 
                     block.next_update()
                 };
@@ -119,7 +119,7 @@ pub trait Block: Send + Sync {
                     let mut block = arc_clone.lock().unwrap();
                     let _ = block.update();
                     output_sender_clone
-                        .send(BlockOutput::new(block.name(), block.output()))
+                        .send(BlockOutputMsg::new(block.name(), block.output()))
                         .unwrap();
                 }
             })

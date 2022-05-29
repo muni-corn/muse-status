@@ -107,8 +107,8 @@ impl Client {
 
                             // only matching one thing for now lol
                             match msg {
-                                DaemonMsg::NewOutput(o) => {
-                                    self.data.insert(o.name().clone(), o);
+                                DaemonMsg::NewOutput(msg) => if let Some(output) = msg.data() {
+                                    self.data.insert(output.name().clone(), output);
                                     self.echo_output(collection, &formatter);
                                 }
                                 DaemonMsg::AllData(a) => {

@@ -4,7 +4,7 @@ use crate::{
     errors::*,
     format::{
         self,
-        blocks::{output::BlockOutput, Block},
+        blocks::{output::BlockOutput, Block, BlockOutputMsg},
     },
 };
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,7 @@ impl Daemon {
         let listener = TcpListener::bind(&self.config.daemon_addr)?;
 
         // get channels for block outputs and banners
-        let (block_tx, block_rx) = mpsc::channel::<BlockOutput>();
+        let (block_tx, block_rx) = mpsc::channel::<BlockOutputMsg>();
         let (_banner_tx, banner_rx) = mpsc::channel::<format::Banner>();
 
         // vector for thread handles
@@ -109,7 +109,7 @@ impl Daemon {
 
     fn start_all_blocks(
         &self,
-        sender: Sender<BlockOutput>,
+        sender: Sender<BlockOutputMsg>,
         mut blocks: BlockVec,
     ) -> (Vec<JoinHandle<()>>, Vec<UpdateRequestSender>) {
         let mut handles = Vec::new();
@@ -153,23 +153,27 @@ impl Daemon {
 
     /// Should be run within a separate thread. `self` should NOT be a parameter, as a mutex would
     /// be locked for the entirety of this never-ending function.
-    fn listen_to_blocks(daemon_arc: DaemonMutexArc, block_rx: Receiver<BlockOutput>) {
+    fn listen_to_blocks(daemon_arc: DaemonMutexArc, block_rx: Receiver<BlockOutputMsg>) {
         #[cfg(debug_assertions)]
         println!("listening for block updates");
 
-        while let Ok(output) = block_rx.recv() {
+        while let Ok(msg) = block_rx.recv() {
             #[cfg(debug_assertions)]
             println!(
                 "received block update from {}: {:?}",
-                output.name(), output.text()
+                msg.name(), msg.data()
             );
 
             let mut daemon = daemon_arc.lock().unwrap();
-            daemon
-                .block_outputs
-                .insert(output.name(), output.clone());
+            if let Some(output) = msg.data() {
+                daemon
+                    .block_outputs
+                    .insert(msg.name(), output);
+            } else {
+                daemon.block_outputs.remove(&msg.name());
+            }
 
-            if let Err(e) = daemon.send_output_update_to_all(output) {
+            if let Err(e) = daemon.send_output_update_to_all(msg) {
                 eprintln!("there was an error: {}", e)
             }
         }
@@ -246,7 +250,7 @@ impl Daemon {
     /// Sends data updates to subscribers.
     fn send_output_update_to_all(
         &mut self,
-        new_block_output: BlockOutput,
+        new_block_output: BlockOutputMsg,
     ) -> Result<(), MuseStatusError> {
         #[cfg(debug_assertions)]
         println!("sending output to all subscribers: {:?}", new_block_output);
@@ -359,7 +363,7 @@ pub enum Collection {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DaemonMsg {
     /// New output to be sent to clients
-    NewOutput(BlockOutput),
+    NewOutput(BlockOutputMsg),
 
     /// A Vec of BlockOutputs for all data currently known by the daemon.
     AllData(Vec<BlockOutput>),

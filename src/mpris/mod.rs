@@ -1,6 +1,6 @@
 use crate::errors::*;
 use crate::format::blocks::output::{BlockOutput, BlockOutputContent, NiceOutput};
-use crate::format::blocks::{Block, NextUpdate};
+use crate::format::blocks::{Block, NextUpdate, BlockOutputMsg};
 use crate::format::Attention;
 use mpris as mpris_lib;
 use std::sync::mpsc::Sender;
@@ -57,7 +57,7 @@ impl MprisBlock {
 
     fn main_iteration(
         mutex: Arc<Mutex<Box<Self>>>,
-        block_sender: Sender<BlockOutput>,
+        block_sender: Sender<BlockOutputMsg>,
     ) -> Result<(), MuseStatusError> {
         let players = loop {
             if let Ok(player_finder) = mpris_lib::PlayerFinder::new() {
@@ -92,7 +92,7 @@ impl MprisBlock {
             })?;
             block.set_metadata(metadata);
             block_sender
-                .send(BlockOutput::new(block.name(), block.output()))
+                .send(BlockOutputMsg::new(block.name(), block.output()))
                 .unwrap();
         }
 
@@ -114,7 +114,7 @@ impl MprisBlock {
                     }
 
                     block_sender
-                        .send(BlockOutput::new(block.name(), block.output()))
+                        .send(BlockOutputMsg::new(block.name(), block.output()))
                         .unwrap();
                 }
             }
@@ -125,7 +125,7 @@ impl MprisBlock {
             let mut block = mutex.lock().unwrap();
             block.status = PlayerStatus::Stopped;
             block_sender
-                .send(BlockOutput::new(block.name(), block.output()))
+                .send(BlockOutputMsg::new(block.name(), block.output()))
                 .unwrap();
         }
 
@@ -136,7 +136,7 @@ impl MprisBlock {
 impl Block for MprisBlock {
     fn run(
         self: Box<Self>,
-        block_sender: Sender<BlockOutput>,
+        block_sender: Sender<BlockOutputMsg>,
     ) -> (Vec<JoinHandle<()>>, Sender<()>) {
         // This might seem dumb, but MprisBlock updates are dependent on updates from the mpris
         // client, so it will not listen to any "notify" requests
