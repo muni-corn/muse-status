@@ -1,6 +1,3 @@
-/// A separate module for the Bit struct.
-pub mod bit;
-
 /// The module for all things blocks.
 pub mod blocks;
 
@@ -119,9 +116,6 @@ pub struct Formatter {
 
 /// The output of a Banner.
 pub enum BannerOutput {
-    /// A single bit as output.
-    SingleBit(bit::Bit),
-
     /// Custom output.
     Custom(String),
 }
