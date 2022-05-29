@@ -1,5 +1,5 @@
 use crate::errors::*;
-use crate::format::blocks::output::{BlockOutputContent, NiceOutput};
+use crate::format::blocks::output::{BlockOutput, BlockText};
 use crate::format::blocks::{Block, NextUpdate};
 use crate::format::Attention;
 use std::process::Command;
@@ -253,13 +253,8 @@ impl Block for VolumeBlock {
         None
     }
 
-    fn output(&self) -> Option<BlockOutputContent> {
-        Some(BlockOutputContent::Nice(NiceOutput {
-            icon: self.get_icon(),
-            primary_text: self.get_text(),
-            secondary_text: None,
-            attention: Attention::Dim,
-        }))
+    fn output(&self) -> Option<BlockOutput> {
+        Some(BlockOutput::new(self.name(), Some(self.get_icon()), BlockText::Single(self.get_text()), Attention::Dim))
     }
 }
 
