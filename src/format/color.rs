@@ -24,7 +24,7 @@ pub enum Color {
 }
 
 /// Represents an RGBA color using bytes, each 0 - 255.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct RGBA {
     /// Red.
     pub r: u8,
