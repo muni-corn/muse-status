@@ -21,6 +21,8 @@ pub fn cubic_ease_arc(mut x: f32) -> f32 {
     cubic
 }
 
+/// Creates a Pango string from the text. The text is colored with `rgba` if it's `Some` and sets
+/// the font to `font` if it is `Some`.
 pub fn make_pango_string(
     text: &str,
     rgba: Option<RGBA>,

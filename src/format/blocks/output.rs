@@ -20,6 +20,7 @@ pub struct BlockOutput {
 }
 
 impl BlockOutput {
+    /// Creates a new `BlockOutput`.
     pub fn new(block_name: &str, icon: Option<char>, text: BlockText, attention: Attention) -> Self {
         Self {
             block_name: block_name.to_string(),
@@ -115,6 +116,7 @@ impl BlockText {
     ///
     /// If `Pair`, the long version is both strings, colored differently to accent the 'primary'
     /// text.
+    #[allow(dead_code)]
     fn to_long_pango_string(&self, primary_color: RGBA, secondary_color: RGBA) -> String {
         // why is this implemented this way?
         //

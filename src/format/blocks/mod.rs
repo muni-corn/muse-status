@@ -35,6 +35,8 @@ pub struct BlockOutputMsg {
 }
 
 impl BlockOutputMsg {
+    /// Creates a new `BlockOutputMsg` with the name and optional `BlockOutput`. If `data` is
+    /// `None`, then the block will be omitted from the status bar until it is `Some` again.
     pub fn new(name: &str, data: Option<BlockOutput>) -> Self {
         Self {
             name: name.to_string(),
@@ -42,10 +44,12 @@ impl BlockOutputMsg {
         }
     }
 
+    /// Returns the name of the original block this output came from.
     pub fn name(&self) -> String {
         self.name.clone()
     }
 
+    /// Returns the data of this `BlockOutputMsg`.
     pub fn data(&self) -> Option<BlockOutput> {
         self.data.to_owned()
     }

@@ -343,6 +343,7 @@ impl Formatter {
         self.get_pulse_color(&self.warning_color, 2.0)
     }
 
+    #[allow(dead_code)]
     fn color_to_rgba(&self, c: &Color) -> RGBA {
         match c {
             Color::Alarm => self.alarm_color.clone(),
