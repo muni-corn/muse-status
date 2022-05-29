@@ -263,7 +263,7 @@ impl Block for BatteryBlock {
         "battery"
     }
 
-    fn output(&self) -> Option<BlockOutputContent> {
+    fn output(&self) -> Option<BlockOutput> {
         match &self.current_read {
             Some(current_read) => {
                 let now = Local::now();
@@ -274,7 +274,7 @@ impl Block for BatteryBlock {
                     _ => format!("{}%", percent),
                 };
 
-                let secondary_text = match current_read.status {
+                let secondary_text_opt = match current_read.status {
                     ChargeStatus::Full => Some(String::from("Plugged in")),
                     _ => match self.get_completion_time() {
                         Some(completion_time) => {
@@ -323,12 +323,12 @@ impl Block for BatteryBlock {
                     Attention::Normal
                 };
 
-                Some(BlockOutputContent::Nice(NiceOutput {
-                    primary_text,
-                    secondary_text,
-                    icon,
-                    attention,
-                }))
+                let block_text = if let Some(secondary_text) = secondary_text_opt {
+                    BlockText::Pair(primary_text, secondary_text)
+                } else {
+                    BlockText::Single(primary_text)
+                };
+                Some(BlockOutput::new(self.name(), Some(icon), block_text, attention))
             }
             None => None,
         }
