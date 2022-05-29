@@ -1,6 +1,6 @@
 use crate::{
     errors::*,
-    format::{color::RGBA, Formatter, Mode},
+    format::{color::RGBA, Mode},
 };
 use std::{fs, borrow::Cow};
 use std::path::Path;
@@ -22,7 +22,6 @@ pub fn cubic_ease_arc(mut x: f32) -> f32 {
 }
 
 pub fn make_pango_string(
-    fmt: &Formatter,
     text: &str,
     rgba: Option<RGBA>,
     font: Option<&str>,

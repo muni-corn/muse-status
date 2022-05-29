@@ -44,7 +44,7 @@ impl BlockOutput {
     /// secondary text.
     pub fn as_pango_strings(&self, f: &Formatter) -> (String, Option<String>) {
         let (primary_color, secondary_color) = self.attention.colors(f);
-        self.text.to_pango_strings(f, primary_color, secondary_color)
+        self.text.to_pango_strings(primary_color, secondary_color)
     }
 }
 
@@ -73,7 +73,6 @@ impl BlockText {
     /// string.
     fn to_pango_strings(
         &self,
-        fmt: &Formatter,
         primary_color: RGBA,
         secondary_color: RGBA,
     ) -> (String, Option<String>) {
@@ -84,11 +83,11 @@ impl BlockText {
                     BlockText::Single(_) => primary_color,
                     BlockText::Pair(_, _) => secondary_color,
                 };
-                utils::make_pango_string(fmt, s, Some(color), None)
+                utils::make_pango_string(s, Some(color), None)
             }
         };
 
-        let short = self.to_short_pango_string(fmt, primary_color);
+        let short = self.to_short_pango_string(primary_color);
         let long = if let Some(ref short_str) = short {
             format!("{}  {}", short_str, second_half)
         } else {
@@ -103,10 +102,10 @@ impl BlockText {
     /// If `Single`, the short version is `None`.
     ///
     /// If `Pair`, the short version is only the primary string.
-    fn to_short_pango_string(&self, fmt: &Formatter, primary_color: RGBA) -> Option<String> {
+    fn to_short_pango_string(&self, primary_color: RGBA) -> Option<String> {
         match self {
             BlockText::Single(_) => None,
-            BlockText::Pair(p, _) => Some(utils::make_pango_string(fmt, p, Some(primary_color), None))
+            BlockText::Pair(p, _) => Some(utils::make_pango_string(p, Some(primary_color), None))
         }
     }
 
@@ -116,7 +115,7 @@ impl BlockText {
     ///
     /// If `Pair`, the long version is both strings, colored differently to accent the 'primary'
     /// text.
-    fn to_long_pango_string(&self, fmt: &Formatter, primary_color: RGBA, secondary_color: RGBA) -> String {
+    fn to_long_pango_string(&self, primary_color: RGBA, secondary_color: RGBA) -> String {
         // why is this implemented this way?
         //
         // this function should return *only* the long version of the text.
@@ -131,6 +130,6 @@ impl BlockText {
         //
         // `to_short_pango_string` has to be called anyway to create the long string, so there's no
         // harm in having it called in `to_pango_strings`.
-        self.to_pango_strings(fmt, primary_color, secondary_color).0
+        self.to_pango_strings(primary_color, secondary_color).0
     }
 }
