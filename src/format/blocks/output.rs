@@ -12,11 +12,8 @@ pub struct BlockOutput {
     /// The icon of the block.
     icon: Option<char>,
 
-    /// The primary text of the block, to be displayed with a primary color.
-    primary_text: String,
-
-    /// The secondary text of the block, to be displayed with a secondary color.
-    secondary_text: Option<String>,
+    /// The text to show for the block.
+    text: BlockText,
 
     /// The Attention level of the output, which may give the block a special color.
     attention: Attention,
