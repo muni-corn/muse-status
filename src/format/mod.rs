@@ -115,12 +115,6 @@ pub struct Formatter {
     banners: VecDeque<Banner>,
 }
 
-/// The output of a Banner.
-pub enum BannerOutput {
-    /// Custom output.
-    Custom(String),
-}
-
 /// A banner temporarily hides all blocks on the status bar to bring information front and center
 /// for a set duration of time.
 #[allow(dead_code)]
@@ -129,7 +123,7 @@ pub struct Banner {
     id: String,
 
     /// Banner content.
-    content: BannerOutput,
+    text: String,
 
     /// How long the banner should remain visible.
     seconds: f32,
