@@ -161,13 +161,13 @@ impl Daemon {
             #[cfg(debug_assertions)]
             println!(
                 "received block update from {}: {:?}",
-                output.block_name, output.body
+                output.name(), output.text()
             );
 
             let mut daemon = daemon_arc.lock().unwrap();
             daemon
                 .block_outputs
-                .insert(output.block_name.clone(), output.clone());
+                .insert(output.name(), output.clone());
 
             if let Err(e) = daemon.send_output_update_to_all(output) {
                 eprintln!("there was an error: {}", e)
@@ -251,7 +251,7 @@ impl Daemon {
         #[cfg(debug_assertions)]
         println!("sending output to all subscribers: {:?}", new_block_output);
 
-        let block_name = new_block_output.block_name.clone();
+        let block_name = new_block_output.name();
         let serialized_output = serde_json::to_string(&DaemonMsg::NewOutput(new_block_output))?;
         let config = &self.config;
 
