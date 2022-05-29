@@ -1,7 +1,7 @@
 use crate::errors::*;
-use crate::format::blocks::output::*;
 use crate::format::blocks::*;
 use crate::format::Attention;
+use crate::format::blocks::output::BlockText;
 use chrono::Duration;
 use nl80211::Socket;
 use std::process::Command;
@@ -231,24 +231,28 @@ impl Block for NetworkBlock {
         Some(NextUpdate::In(Duration::seconds(UPDATE_INTERVAL_SECONDS)))
     }
 
-    fn output(&self) -> Option<BlockOutputContent> {
+    fn output(&self) -> Option<BlockOutput> {
         let icon = self.get_icon();
         match &self.status {
             NetworkStatus::Disconnected | NetworkStatus::Unknown | NetworkStatus::Disabled => {
-                Some(BlockOutputContent::from(NiceOutput {
-                    attention: Attention::Dim,
-                    icon,
-                    primary_text: self.status.to_string().unwrap_or_else(|| "".to_string()),
-                    secondary_text: None,
-                }))
+                // 'dim' statuses; disconnected or otherwise
+                let text = BlockText::Single(self.status.to_string().unwrap_or_default());
+                Some(BlockOutput::new(self.name(), Some(icon), text, Attention::Dim))
             }
             NetworkStatus::Connected | NetworkStatus::PacketLoss => {
-                Some(BlockOutputContent::from(NiceOutput {
-                    attention: Attention::Normal,
-                    icon,
-                    primary_text: self.ssid.clone().unwrap_or_default(),
-                    secondary_text: self.status.to_string(),
-                }))
+                let text = if let Some(ssid) = &self.ssid {
+                    if let Some(status) = self.status.to_string() {
+                        // we have both ssid and status, so we can do a pair
+                        BlockText::Pair(ssid.to_owned(), status)
+                    } else {
+                        // if no status, we'll just do ssid. it's okay
+                        BlockText::Single(ssid.to_owned())
+                    }
+                } else {
+                    // if no ssid, we'll count on `status` to give us something
+                    BlockText::Single(self.status.to_string().unwrap_or_default())
+                };
+                Some(BlockOutput::new(self.name(), Some(icon), text, Attention::Normal))
             }
             _ => None,
         }
