@@ -88,19 +88,15 @@ impl Block for BrightnessBlock {
         None
     }
 
-    fn output(&self) -> Option<BlockOutputContent> {
+    fn output(&self) -> Option<BlockOutput> {
         if self.max_brightness == 0 {
             return None;
         }
 
         let percent = self.current_brightness * 100 / self.max_brightness;
         let icon = get_icon(percent as u32);
-        Some(BlockOutputContent::Nice(NiceOutput {
-            icon,
-            primary_text: format!("{}%", percent),
-            secondary_text: None,
-            attention: Attention::Dim,
-        }))
+        let block_text = BlockText::Single(format!("{}%", percent));
+        Some(BlockOutput::new(self.name(), Some(icon), block_text, Attention::Dim))
     }
 }
 
