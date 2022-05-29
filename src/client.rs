@@ -108,12 +108,12 @@ impl Client {
                             // only matching one thing for now lol
                             match msg {
                                 DaemonMsg::NewOutput(o) => {
-                                    self.data.insert(o.block_name.clone(), o);
+                                    self.data.insert(o.name().clone(), o);
                                     self.echo_output(collection, &formatter);
                                 }
                                 DaemonMsg::AllData(a) => {
                                     for output in a {
-                                        self.data.insert(output.block_name.clone(), output);
+                                        self.data.insert(output.name().clone(), output);
                                     }
                                     self.echo_output(collection, &formatter);
                                 }
