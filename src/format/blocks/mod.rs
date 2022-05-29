@@ -3,6 +3,7 @@ pub mod output;
 
 use crate::{errors::UpdateError, format};
 use chrono::{DateTime, Duration, Local};
+use serde::{Deserialize, Serialize};
 use std::{
     sync::{
         mpsc::{self, Sender},
@@ -21,6 +22,33 @@ pub enum NextUpdate {
 
     /// The next update occurs at a specified time.
     At(DateTime<Local>),
+}
+
+/// A type to represent the block output that is sent over MPSC channels.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct BlockOutputMsg {
+    /// The name of the block.
+    name: String,
+
+    /// The output of the block. If None, the block is (temporarily) removed from the status bar
+    data: Option<BlockOutput>
+}
+
+impl BlockOutputMsg {
+    pub fn new(name: &str, data: Option<BlockOutput>) -> Self {
+        Self {
+            name: name.to_string(),
+            data,
+        }
+    }
+
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn data(&self) -> Option<BlockOutput> {
+        self.data.to_owned()
+    }
 }
 
 /// Block is a piece of data in the status bar.
