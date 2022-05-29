@@ -86,12 +86,10 @@ impl WeatherBlock {
     }
 
     fn get_weather_icon(&self, report: &FullWeatherReport) -> char {
-        if let Some(r) = report.weather.get(0) {
+        report.weather.first().map(|r| {
             let icon_string = &r.icon;
             self.config.weather_icons[icon_string]
-        } else {
-            self.config.default_icon
-        }
+        }).unwrap_or(self.config.default_icon)
     }
 
     fn update_current_report(&mut self) -> Result<(), UpdateError> {
