@@ -219,6 +219,14 @@ impl Formatter {
                         secondary,
                         tertiary,
                     } => {
+                        // starting from tertiary, then to secondary, then to primary (we're
+                        // assuming our status bar is right-aligned, like i3 or swaybar, and we'll
+                        // arrange the status bar right-to-left in order of importance)
+                        //
+                        // primary is reversed because it is by default arranged left-to-right.
+                        // secondary and tertiary are assumed to be right-to-left.
+                        //
+                        // we should probably change that.
                         for block_output in tertiary
                             .iter()
                             .chain(secondary.iter().chain(primary.iter().rev()))
