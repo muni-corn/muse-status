@@ -148,42 +148,6 @@ impl WeatherBlock {
 
         Ok(())
     }
-
-    /// Returns a number with a little circle-thing next to it.
-    pub fn get_temperature_string(&self) -> Option<String> {
-        if let Some(r) = &self.current_report {
-            if r.weather.is_empty() {
-                None
-            } else {
-                Some(format!("{}°", r.main.temp.round() as i32))
-            }
-        } else {
-            None
-        }
-    }
-
-    /// Returns a String-ified weather description, in Sentence case.
-    pub fn get_weather_description(&self) -> Option<String> {
-        if let Some(r) = &self.current_report {
-            if r.weather.is_empty() {
-                None
-            } else {
-                let mut desc = r.weather[0].description.to_owned();
-
-                // capitalize the first letter in the description
-                match desc.chars().next() {
-                    Some(c) => {
-                        desc = format!("{}{}", c.to_uppercase(), &desc[1..]);
-                    }
-                    None => return None,
-                }
-
-                Some(desc)
-            }
-        } else {
-            None
-        }
-    }
 }
 
 impl Block for WeatherBlock {
