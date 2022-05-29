@@ -365,7 +365,9 @@ impl Formatter {
 
         let json = JsonBlock {
             full_text,
-            short_text,
+            short_text: short_text.unwrap_or_default(), // TODO: Make short_text optional.
+                                                        // It is not required as part of
+                                                        // the JSON protocol for sway.
             separator: true,
             markup: String::from("pango"),
             name: block_output.name(),
