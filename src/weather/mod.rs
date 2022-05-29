@@ -180,16 +180,16 @@ impl Block for WeatherBlock {
         "weather"
     }
 
-    fn output(&self) -> Option<BlockOutputContent> {
+    fn output(&self) -> Option<BlockOutput> {
         self.current_report.as_ref().map(|r| {
-            BlockOutputContent::from(NiceOutput {
-                attention: Attention::Normal,
-                icon: self.get_weather_icon(r),
-                primary_text: self
-                    .get_temperature_string()
-                    .unwrap_or_else(|| "".to_string()),
-                secondary_text: self.get_weather_description(),
-            })
+            let temp_string = r.temperature_string();
+
+            let text = if let Some(desc) = r.description() {
+                BlockText::Pair(temp_string, desc)
+            } else {
+                BlockText::Single(temp_string)
+            };
+            BlockOutput::new(self.name(), Some(self.get_weather_icon(r)), text, Attention::Normal)
         })
     }
 
