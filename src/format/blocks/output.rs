@@ -1,5 +1,3 @@
-use crate::format::bit::Bit;
-use crate::format::color::Color;
 use crate::format::color::RGBA;
 use crate::format::{Attention, Formatter};
 use crate::utils;
