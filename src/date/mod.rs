@@ -79,18 +79,16 @@ impl Block for DateBlock {
 
 /// Returns a greeting based on the hour of the day
 #[allow(dead_code)]
-fn get_greeting() -> String {
+fn get_greeting() -> &'static str {
     let hour = Local::now().hour();
 
-    let greeting = if hour < 12 {
+    if hour < 12 {
         "Good morning!"
     } else if (12..17).contains(&hour) {
         "Good afternoon!"
     } else {
         "Good evening!"
-    };
-
-    String::from(greeting)
+    }
 }
 
 /// Returns the time of the next minute of the hour.
