@@ -96,7 +96,14 @@ fn get_greeting() -> String {
 /// Returns the time of the next minute of the hour.
 fn get_next_minute() -> DateTime<Local> {
     let now = Local::now();
-    (now + Duration::minutes(1)).with_second(0).unwrap()
+    let in_one_minute = now + Duration::minutes(1);
+    if let Some(truncated) = in_one_minute.with_second(0) {
+        truncated
+    } else {
+        // default to an un-truncated minute ahead of time (as if that would be valid if
+        // `with_second` failed)
+        in_one_minute
+    }
 }
 
 /// Returns a time that is either at the next minute of the hour or in five seconds, whichever
