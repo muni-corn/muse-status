@@ -1,5 +1,5 @@
 use crate::errors::*;
-use crate::format::blocks::output::{BlockOutput, BlockOutputContent, NiceOutput};
+use crate::format::blocks::output::{BlockOutput, BlockText};
 use crate::format::blocks::{Block, NextUpdate, BlockOutputMsg};
 use crate::format::Attention;
 use mpris as mpris_lib;
@@ -168,15 +168,25 @@ impl Block for MprisBlock {
         Some(NextUpdate::In(chrono::Duration::seconds(5)))
     }
 
-    fn output(&self) -> Option<BlockOutputContent> {
+    fn output(&self) -> Option<BlockOutput> {
         match self.status {
             PlayerStatus::Stopped => None,
-            _ => Some(BlockOutputContent::from(NiceOutput {
-                primary_text: self.title.clone().unwrap_or_default(),
-                secondary_text: self.artist.clone(),
-                icon: self.get_icon(),
-                attention: Attention::Normal,
-            })),
+            _ => {
+                let text = if let Some(title) = &self.title {
+                    if let Some(artist) = &self.artist {
+                        // title and artist exist, so we can do a pair!
+                        BlockText::Pair(title.to_owned(), artist.to_owned())
+                    } else {
+                        // title exists, but no artist
+                        BlockText::Single(title.to_owned())
+                    }
+                } else {
+                    // no title (and we'll exclude the artist too, even if it's something)
+                    // use some generic default string
+                    BlockText::Single(String::from("Media is playing"))
+                };
+                Some(BlockOutput::new(self.name(), Some(self.get_icon()), text, Attention::Normal))
+            },
         }
     }
 }
