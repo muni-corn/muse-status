@@ -20,6 +20,14 @@ pub struct BlockOutput {
 }
 
 impl BlockOutput {
+    pub fn new(block_name: &str, icon: Option<char>, text: BlockText, attention: Attention) -> Self {
+        Self {
+            block_name: block_name.to_string(),
+            icon,
+            text,
+            attention
+        }
+    }
     /// Returns the name of the block this output is from.
     pub fn name(&self) -> String {
         self.block_name.to_owned()
