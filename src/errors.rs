@@ -130,8 +130,8 @@ impl Display for UpdateError {
 impl From<SendError<BlockOutput>> for UpdateError {
     fn from(e: SendError<BlockOutput>) -> Self {
         Self {
-            block_name: e.0.block_name,
-            message: format!("data couldn't be sent: {:?}", e.0.body),
+            block_name: e.0.name(),
+            message: format!("data couldn't be sent: {:?}", e.0.text()),
         }
     }
 }
