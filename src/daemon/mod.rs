@@ -182,9 +182,7 @@ impl Daemon {
     /// Should be run within a separate thread. `self` should NOT be a parameter, as a mutex would
     /// be locked for the entirety of this never-ending function.
     fn listen_for_banners(_daemon_arc: DaemonMutexArc, _banner_rx: Receiver<format::Banner>) {
-        // while let Ok(_) = banner_rx.recv() {
-        //     let _ = daemon_arc.lock().unwrap().send_data_to_all();
-        // }
+        todo!()
     }
 
     fn subscribe_client(
@@ -289,7 +287,7 @@ impl Daemon {
         let all_outputs = self
             .block_outputs
             .iter()
-            .map(|t| t.1.to_owned())
+            .map(|(_, v)| v.to_owned())
             .collect::<Vec<BlockOutput>>();
         let msg = DaemonMsg::AllData(all_outputs);
         send_serialized_data(sub, &serde_json::to_string(&msg)?)
@@ -390,7 +388,7 @@ pub enum DataPayload {
 
 impl DataPayload {
     /// Creates a Ranked DataPayload out of the outputs provided.
-    pub fn ranked(config: &Config, outputs: &HashMap<String, BlockOutput>) -> Self {
+    pub fn ranked(config: &Config, outputs: &BlockOutputs) -> Self {
         let (primary, secondary, tertiary) = (
             Self::make_vec(&config.primary_order, outputs),
             Self::make_vec(&config.secondary_order, outputs),
@@ -405,7 +403,7 @@ impl DataPayload {
     }
 
     /// Creates a Ranked DataPayload out of the outputs provided, but only with primary blocks.
-    pub fn only_primary(config: &Config, outputs: &HashMap<String, BlockOutput>) -> Self {
+    pub fn only_primary(config: &Config, outputs: &BlockOutputs) -> Self {
         let v = Self::make_vec(&config.primary_order, outputs);
 
         Self::Ranked {
@@ -416,7 +414,7 @@ impl DataPayload {
     }
 
     /// Creates a Ranked DataPayload out of the outputs provided, but only with secondary blocks.
-    pub fn only_secondary(config: &Config, outputs: &HashMap<String, BlockOutput>) -> Self {
+    pub fn only_secondary(config: &Config, outputs: &BlockOutputs) -> Self {
         let v = Self::make_vec(&config.secondary_order, outputs);
 
         Self::Ranked {
@@ -427,7 +425,7 @@ impl DataPayload {
     }
 
     /// Creates a Ranked DataPayload out of the outputs provided, but only with tertiary blocks.
-    pub fn only_tertiary(config: &Config, outputs: &HashMap<String, BlockOutput>) -> Self {
+    pub fn only_tertiary(config: &Config, outputs: &BlockOutputs) -> Self {
         let v = Self::make_vec(&config.tertiary_order, outputs);
 
         Self::Ranked {
@@ -438,25 +436,18 @@ impl DataPayload {
     }
 
     /// Creates an Unranked DataPayload out any arbitrary combination of blocks.
-    pub fn from_many(names: &[String], outputs: &HashMap<String, BlockOutput>) -> Self {
+    pub fn from_many(names: &[String], outputs: &BlockOutputs) -> Self {
         let v = Self::make_vec(names, outputs);
         Self::Unranked(v)
     }
 
     /// Creates an Unranked DataPayload out of exactly one arbitrary block.
-    pub fn from_one(name: &str, outputs: &HashMap<String, BlockOutput>) -> Self {
+    pub fn from_one(name: &str, outputs: &BlockOutputs) -> Self {
         Self::Unranked(Self::make_vec(&[name.to_string()], outputs))
     }
 
-    fn make_vec(names: &[String], outputs: &HashMap<String, BlockOutput>) -> Vec<BlockOutput> {
-        let mut v = Vec::new();
-        for name in names {
-            if let Some(o) = outputs.get(name) {
-                v.push(o.clone());
-            }
-        }
-
-        v
+    fn make_vec(names: &[String], outputs: &BlockOutputs) -> Vec<BlockOutput> {
+        names.iter().filter_map(|name| outputs.get(name).cloned()).collect()
     }
 }
 
