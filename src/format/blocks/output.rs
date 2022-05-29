@@ -28,9 +28,15 @@ impl BlockOutput {
             attention
         }
     }
+
     /// Returns the name of the block this output is from.
     pub fn name(&self) -> String {
         self.block_name.to_owned()
+    }
+
+    /// Returns the block content (the text)
+    pub fn text(&self) -> &BlockText {
+        &self.text
     }
 
     /// Formats the output as a pango string. The first string returned is the full text including
