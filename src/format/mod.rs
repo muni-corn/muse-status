@@ -100,7 +100,8 @@ impl FromStr for Mode {
     }
 }
 
-/// Fonts, colors and more for muse-status
+/// Sets fonts, colors and more for muse-status. Its most important job is converting all data into
+/// a format that can be read by status bars (and you!).
 pub struct Formatter {
     formatting_mode: Mode,
     primary_color: RGBA,
