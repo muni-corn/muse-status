@@ -80,10 +80,11 @@ pub trait Block: Send + Sync {
         let loop_handle = thread::Builder::new()
             .name(loop_thread_name)
             .spawn(move || loop {
+                // update block and return next update
                 let next_update_opt = {
                     let mut block = block_arc_mutex.lock().unwrap();
 
-                    // update and update the bar
+                    // update block and then update the bar
                     if let Err(e) = block.update() {
                         println!("{}", e)
                     }
@@ -92,6 +93,7 @@ pub trait Block: Send + Sync {
                     block.next_update()
                 };
 
+                // sleep until next update
                 if let Some(next_update) = next_update_opt {
                     let chrono_duration = match next_update {
                         NextUpdate::At(date_time) => {
