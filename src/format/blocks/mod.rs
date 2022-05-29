@@ -69,11 +69,13 @@ pub trait Block: Send + Sync {
                         NextUpdate::At(date_time) => {
                             let now = Local::now();
                             date_time - now
-                        },
+                        }
                         NextUpdate::In(duration) => duration,
                     };
 
-                    let std_duration = chrono_duration.to_std().unwrap_or(time::Duration::from_secs(5));
+                    let std_duration = chrono_duration
+                        .to_std()
+                        .unwrap_or(time::Duration::from_secs(5));
                     thread::sleep(std_duration);
                 } else {
                     break;
