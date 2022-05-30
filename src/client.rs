@@ -92,10 +92,7 @@ impl Client {
                 let mut s = String::new();
                 #[allow(clippy::single_match)]
                 match buf_stream.read_line(&mut s) {
-                    Ok(n) => {
-                        if n == 0 {
-                            break 'inner;
-                        } else {
+                    Ok(n) if n > 0 => {
                             // `s` should be a DaemonMsg
                             let msg = match serde_json::from_str::<DaemonMsg>(&s) {
                                 Ok(m) => m,
@@ -116,6 +113,7 @@ impl Client {
                                         self.data.remove(&msg.name());
                                     }
                                 }
+
                                 // the daemon has sent us all the data it has.
                                 DaemonMsg::AllData(a) => {
                                     for output in a {
@@ -123,11 +121,20 @@ impl Client {
                                     }
                                 }
                             }
-                        }
 
-                        self.echo_output(collection, &formatter);
-                    }
-                    Err(e) => eprintln!("{}", e),
+                            self.echo_output(collection, &formatter);
+                        }
+                        Ok(_) => {
+                            // a non-positive amount of bytes were read in this case, so the stream has
+                            // reached EOF. we'll stop reading from the stream
+                            break 'inner;
+                        }
+                        Err(e) => {
+                            // an error occurred, so we'll print the error to stderr and stop reading
+                            // from the stream
+                            eprintln!("{}", e);
+                            break 'inner;
+                        }
                 }
             }
 
