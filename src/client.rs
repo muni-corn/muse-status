@@ -2,7 +2,7 @@ use crate::{
     config::{self, Config},
     daemon::{Collection, DaemonMsg, DataPayload},
     errors::MuseStatusError,
-    format::{blocks::BlockOutput, Formatter},
+    format::{blocks::BlockOutput, Formatter, Mode},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -78,7 +78,7 @@ impl Client {
         let formatter = Formatter::from_env().unwrap();
 
         // if using the json protocol, this header is needed
-        if let crate::format::Mode::JsonProtocol = formatter.get_format_mode() {
+        if let Mode::JsonProtocol = formatter.get_format_mode() {
             println!("{{\"version\":1}}");
             println!("[[]");
         }
@@ -93,48 +93,48 @@ impl Client {
                 #[allow(clippy::single_match)]
                 match buf_stream.read_line(&mut s) {
                     Ok(n) if n > 0 => {
-                            // `s` should be a DaemonMsg
-                            let msg = match serde_json::from_str::<DaemonMsg>(&s) {
-                                Ok(m) => m,
-                                Err(e) => {
-                                    eprintln!("{}", e);
-                                    break 'inner;
-                                }
-                            };
+                        // `s` should be a DaemonMsg
+                        let msg = match serde_json::from_str::<DaemonMsg>(&s) {
+                            Ok(m) => m,
+                            Err(e) => {
+                                eprintln!("{}", e);
+                                break 'inner;
+                            }
+                        };
 
-                            match msg {
-                                // the daemon has an updated output for us. if the data is `Some`
-                                // data, then we'll update it in the status bar. if it's `None`,
-                                // we'll remove it from the status bar
-                                DaemonMsg::NewOutput(msg) => {
-                                    if let Some(output) = msg.data() {
-                                        self.data.insert(output.name().clone(), output);
-                                    } else {
-                                        self.data.remove(&msg.name());
-                                    }
-                                }
-
-                                // the daemon has sent us all the data it has.
-                                DaemonMsg::AllData(a) => {
-                                    for output in a {
-                                        self.data.insert(output.name().clone(), output);
-                                    }
+                        match msg {
+                            // the daemon has an updated output for us. if the data is `Some`
+                            // data, then we'll update it in the status bar. if it's `None`,
+                            // we'll remove it from the status bar
+                            DaemonMsg::NewOutput(msg) => {
+                                if let Some(output) = msg.data() {
+                                    self.data.insert(output.name().clone(), output);
+                                } else {
+                                    self.data.remove(&msg.name());
                                 }
                             }
 
-                            self.echo_output(collection, &formatter);
+                            // the daemon has sent us all the data it has.
+                            DaemonMsg::AllData(a) => {
+                                for output in a {
+                                    self.data.insert(output.name().clone(), output);
+                                }
+                            }
                         }
-                        Ok(_) => {
-                            // a non-positive amount of bytes were read in this case, so the stream has
-                            // reached EOF. we'll stop reading from the stream
-                            break 'inner;
-                        }
-                        Err(e) => {
-                            // an error occurred, so we'll print the error to stderr and stop reading
-                            // from the stream
-                            eprintln!("{}", e);
-                            break 'inner;
-                        }
+
+                        self.echo_output(collection, &formatter);
+                    }
+                    Ok(_) => {
+                        // a non-positive amount of bytes were read in this case, so the stream has
+                        // reached EOF. we'll stop reading from the stream
+                        break 'inner;
+                    }
+                    Err(e) => {
+                        // an error occurred, so we'll print the error to stderr and stop reading
+                        // from the stream
+                        eprintln!("{}", e);
+                        break 'inner;
+                    }
                 }
             }
 
