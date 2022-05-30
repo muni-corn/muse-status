@@ -105,20 +105,27 @@ impl Client {
                                 }
                             };
 
-                            // only matching one thing for now lol
                             match msg {
-                                DaemonMsg::NewOutput(msg) => if let Some(output) = msg.data() {
-                                    self.data.insert(output.name().clone(), output);
-                                    self.echo_output(collection, &formatter);
+                                // the daemon has an updated output for us. if the data is `Some`
+                                // data, then we'll update it in the status bar. if it's `None`,
+                                // we'll remove it from the status bar
+                                DaemonMsg::NewOutput(msg) => {
+                                    if let Some(output) = msg.data() {
+                                        self.data.insert(output.name().clone(), output);
+                                    } else {
+                                        self.data.remove(&msg.name());
+                                    }
                                 }
+                                // the daemon has sent us all the data it has.
                                 DaemonMsg::AllData(a) => {
                                     for output in a {
                                         self.data.insert(output.name().clone(), output);
                                     }
-                                    self.echo_output(collection, &formatter);
                                 }
                             }
                         }
+
+                        self.echo_output(collection, &formatter);
                     }
                     Err(e) => eprintln!("{}", e),
                 }
