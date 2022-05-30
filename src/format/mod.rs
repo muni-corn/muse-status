@@ -46,21 +46,21 @@ impl Attention {
     /// primary and secondary colors, respectively.
     pub fn colors(&self, f: &Formatter) -> (RGBA, RGBA) {
         match self {
-            Self::Normal => (f.primary_color.clone(), f.secondary_color.clone()),
-            Self::Dim => (f.secondary_color.clone(), f.secondary_color.clone()),
-            Self::Warning => (f.warning_color.clone(), f.warning_color.clone()),
-            Self::Alarm => (f.alarm_color.clone(), f.alarm_color.clone()),
+            Self::Normal => (f.primary_color, f.secondary_color),
+            Self::Dim => (f.secondary_color, f.secondary_color),
+            Self::Warning => (f.warning_color, f.warning_color),
+            Self::Alarm => (f.alarm_color, f.alarm_color),
             Self::WarningPulse => {
                 // TODO
                 // let c = f.get_warn_pulse_color();
-                // (c.clone(), c)
-                (f.warning_color.clone(), f.warning_color.clone())
+                // (c, c)
+                (f.warning_color, f.warning_color)
             }
             Self::AlarmPulse => {
                 // TODO
                 // let c = f.get_alarm_pulse_color();
-                // (c.clone(), c)
-                (f.alarm_color.clone(), f.alarm_color.clone())
+                // (c, c)
+                (f.alarm_color, f.alarm_color)
             }
         }
     }
@@ -346,11 +346,11 @@ impl Formatter {
     #[allow(dead_code)]
     fn color_to_rgba(&self, c: &Color) -> RGBA {
         match c {
-            Color::Alarm => self.alarm_color.clone(),
-            Color::Warning => self.warning_color.clone(),
-            Color::Primary => self.primary_color.clone(),
-            Color::Secondary => self.secondary_color.clone(),
-            Color::Other(rgba) => rgba.clone(),
+            Color::Alarm => self.alarm_color,
+            Color::Warning => self.warning_color,
+            Color::Primary => self.primary_color,
+            Color::Secondary => self.secondary_color,
+            Color::Other(rgba) => *rgba,
         }
     }
 
