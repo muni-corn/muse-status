@@ -45,7 +45,24 @@ impl BlockOutput {
     /// secondary text.
     pub fn as_pango_strings(&self, f: &Formatter) -> (String, Option<String>) {
         let (primary_color, secondary_color) = self.attention.colors(f);
-        self.text.to_pango_strings(primary_color, secondary_color)
+        let icon_pango = self.icon.map(|i| utils::make_pango_string(&i.to_string(), Some(primary_color), Some(&f.icon_font)));
+        let (full, short_opt) = self.text.to_pango_strings(primary_color, secondary_color);
+        if let Some(icon) = icon_pango {
+            // strings with icons
+            let full_with_icon = format!("{icon}  {full}");
+            let short_with_icon = if let Some(short) = short_opt {
+                // icon with short text
+                format!("{icon} {short}") // i accidentally only put one space in here, but idk,
+                                          // i kinda like it for shorter texts
+            } else {
+                // icon only, no short text
+                icon
+            };
+            (full_with_icon, Some(short_with_icon))
+        } else {
+            // strings without icons
+            (full, short_opt)
+        }
     }
 }
 
@@ -72,6 +89,9 @@ impl BlockText {
     ///
     /// If `Pair`, the long version is both strings, and the short version is only the primary
     /// string.
+    ///
+    /// TODO: Add `to_pango_strings_with_icon` to include an icon with the primary text and reduce
+    /// the amount of markup we have to do
     fn to_pango_strings(
         &self,
         primary_color: RGBA,
