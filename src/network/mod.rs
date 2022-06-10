@@ -7,6 +7,14 @@ use nl80211::Socket;
 use std::process::Command;
 use std::process::Stdio;
 
+pub enum NetworkType {
+    Wired,
+    Wireless {
+        ssid: Option<String>,
+        strength_percent: i32,
+    },
+}
+
 /// A block that transmits wireless interface data.
 pub struct NetworkBlock {
     iface_name: String,
