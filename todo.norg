@@ -13,6 +13,7 @@
   - battery
   -- [ ] inotify watching for updates instead of polling
   - network
+  -- [ ] detect if wireless interface
   -- [ ] detect vpn
   -- [ ] detect captive portal
   - date
