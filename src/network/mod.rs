@@ -7,6 +7,10 @@ use nl80211::Socket;
 use std::process::Command;
 use std::process::Stdio;
 
+use self::icons::NetworkIcons;
+
+pub mod icons;
+
 pub enum NetworkType {
     Wired,
     Wireless {
@@ -22,50 +26,7 @@ pub struct NetworkBlock {
     ssid: Option<String>,
     strength_percent: i32,
     status: NetworkStatus,
-
-    connection_icons: Vec<char>,
-    packet_loss_icons: Vec<char>,
-    vpn_icons: Vec<char>,
-    disconnected_icon: char,
-    disabled_icon: char,
-    unknown_icon: char,
-}
-
-impl Default for NetworkBlock {
-    fn default() -> Self {
-        Self {
-            iface_name: String::new(),
-
-            ssid: None,
-            strength_percent: 0,
-            status: NetworkStatus::Disconnected,
-
-            connection_icons: vec![
-                '\u{F092F}',
-                '\u{F091F}',
-                '\u{F0922}',
-                '\u{F0925}',
-                '\u{F0928}',
-            ],
-            packet_loss_icons: vec![
-                '\u{F092B}',
-                '\u{F0920}',
-                '\u{F0923}',
-                '\u{F0926}',
-                '\u{F0929}',
-            ],
-            vpn_icons: vec![
-                '\u{F092C}',
-                '\u{F0921}',
-                '\u{F0924}',
-                '\u{F0927}',
-                '\u{F092A}',
-            ],
-            disconnected_icon: '\u{F092F}',
-            disabled_icon: '\u{F092E}',
-            unknown_icon: '\u{F092B}',
-        }
-    }
+    icons: NetworkIcons,
 }
 
 impl NetworkBlock {
@@ -73,7 +34,10 @@ impl NetworkBlock {
     pub fn new(iface_name: &str) -> Result<Self, MuseStatusError> {
         let block = Self {
             iface_name: String::from(iface_name),
-            ..Default::default()
+            status: NetworkStatus::Unknown,
+            icons: NetworkIcons::default(),
+            ssid: None,
+            strength_percent: 0,
         };
 
         Ok(block)
@@ -97,34 +61,6 @@ impl NetworkBlock {
         })?.success();
 
         Ok(!is_success)
-    }
-
-    fn get_icon(&self) -> char {
-        match &self.status {
-            NetworkStatus::Disconnected => self.disconnected_icon,
-            NetworkStatus::Disabled => self.disabled_icon,
-            NetworkStatus::Unknown => self.unknown_icon,
-            _ => {
-                // determine which icons we'll use based on
-                // packet loss or vpn status
-                let icons = if let NetworkStatus::PacketLoss = self.status {
-                    &self.packet_loss_icons
-                } else if let NetworkStatus::Vpn = self.status {
-                    &self.vpn_icons
-                } else {
-                    &self.connection_icons
-                };
-
-                // get the icon
-                let mut icon_index: usize =
-                    (icons.len() as i32 * self.strength_percent / 100) as usize;
-
-                // constrains index
-                icon_index = icon_index.min(icons.len() - 1);
-
-                icons[icon_index]
-            }
-        }
     }
 
     fn get_ip_link_show(&self) -> Result<String, UpdateError> {
@@ -240,7 +176,7 @@ impl Block for NetworkBlock {
     }
 
     fn output(&self) -> Option<BlockOutput> {
-        let icon = self.get_icon();
+        let icon = self.icons.get_wireless_icon(&self.status, self.strength_percent);
         match &self.status {
             NetworkStatus::Disconnected | NetworkStatus::Unknown | NetworkStatus::Disabled => {
                 // 'dim' statuses; disconnected or otherwise

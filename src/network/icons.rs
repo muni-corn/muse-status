@@ -7,6 +7,10 @@ pub struct NetworkIcons {
 }
 
 impl NetworkIcons {
+    pub fn get_wireless_icon(&self, status: &NetworkStatus, strength_percent: i32) -> char {
+        self.wireless.get_icon(status, strength_percent)
+    }
+
     pub fn get_from_status(&self, net_type: &NetworkType, status: &NetworkStatus) -> char {
         match net_type {
             NetworkType::Wired => self.wired.get_icon(status),
