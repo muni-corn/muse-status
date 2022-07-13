@@ -36,9 +36,7 @@ pub enum NetworkType {
 /// A block that transmits network interface data.
 pub struct NetworkBlock {
     iface_name: String,
-
-    ssid: Option<String>,
-    strength_percent: i32,
+    iface_type: NetworkType,
     status: NetworkStatus,
     icons: NetworkIcons,
 }
@@ -46,12 +44,20 @@ pub struct NetworkBlock {
 impl NetworkBlock {
     /// Returns a new NetworkBlock.
     pub fn new(iface_name: &str) -> Result<Self, MuseStatusError> {
+        // first, make sure the path to this interface exists
+        let sys_path = Path::new("/sys/class/net").join(&iface_name);
+        if !sys_path.exists() {
+            return Err(MuseStatusError::Basic(BasicError {
+                message: format!("network interface `{iface_name}` doesn't exist on this system"),
+            }));
+        }
+
+        // then we can create the block
         let block = Self {
             iface_name: String::from(iface_name),
+            iface_type: get_interface_type(iface_name),
             status: NetworkStatus::Unknown,
             icons: NetworkIcons::default(),
-            ssid: None,
-            strength_percent: 0,
         };
 
         Ok(block)
@@ -88,27 +94,27 @@ impl NetworkBlock {
         })?;
         Ok(String::from_utf8_lossy(&stdout).into_owned())
     }
+}
 
-    fn update_status(&mut self) -> Result<(), UpdateError> {
-        let ip_output = self.get_ip_link_show()?;
-        self.status = if ip_output.contains("state UP") {
-            NetworkStatus::Connected
-        } else if ip_output.contains("state DOWN") {
-            if ip_output.contains("NO-CARRIER") {
-                NetworkStatus::Disconnected
-            } else {
-                NetworkStatus::Disabled
-            }
-        } else if ip_output.contains("state DORMANT") {
-            NetworkStatus::Connecting
-        } else {
-            NetworkStatus::Unknown
-        };
+fn get_interface_type<P: AsRef<Path>>(iface_path: P) -> NetworkType {
+    if iface_path.as_ref().join("wireless").exists() {
+        NetworkType::Wireless {
+            ssid: None,
+            strength_percent: 0,
+        }
+    } else {
+        NetworkType::Wired
+    }
+}
 
-        Ok(())
+impl Block for NetworkBlock {
+    // Name returns "network"
+    fn name(&self) -> &str {
+        "network"
     }
 
-    fn update_ssid_strength(&mut self) -> Result<(), UpdateError> {
+    // Updates the network information
+    fn update(&mut self) -> Result<(), UpdateError> {
         // get interface
         let iface = get_interface(&self.iface_name).map_err(|e| {
             self.status = NetworkStatus::Unknown;
@@ -125,63 +131,31 @@ impl NetworkBlock {
             message: format!("{}", e),
         })?;
 
-        // get ssid
-        self.ssid = iface.ssid.map(|ssid| nl80211::parse_string(&ssid));
-        if self.ssid.is_none() {
-            self.status = NetworkStatus::Disconnected;
-        } else {
-            // get signal strength
-            if let Some(s) = station.signal {
-                let dbm = nl80211::parse_i8(&s);
-                self.strength_percent = dbm_to_percentage(dbm as i32);
-                self.status = NetworkStatus::Connected;
-            } else {
-                // if no signal, disconnected maybe?
+        // if wireless, update ssid and strength
+        if let NetworkType::Wireless {
+            ssid,
+            strength_percent,
+        } = &mut self.iface_type
+        {
+            *ssid = iface.ssid.map(|val| nl80211::parse_string(&val));
+            if ssid.is_none() {
                 self.status = NetworkStatus::Disconnected;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl Block for NetworkBlock {
-    // Name returns "network"
-    fn name(&self) -> &str {
-        "network"
-    }
-
-    // Updates the network information
-    fn update(&mut self) -> Result<(), UpdateError> {
-        self.update_status()?;
-
-        match self.status {
-            NetworkStatus::Connected | NetworkStatus::Unknown => {
-                // update ssid and strength to confirm connected status. if status at this point is
-                // Unknown, this might correct it
-                self.update_ssid_strength()?;
-
-                // detect packet loss
-                match self.packet_loss() {
-                    Ok(p) => {
-                        if p {
-                            self.status = NetworkStatus::PacketLoss;
-                        } else {
-                            self.status = NetworkStatus::Connected;
-                        }
-                    }
-                    Err(e) => {
-                        // This is probably an error returned by `ping`, which is why we set the status
-                        // to PacketLoss here
-                        self.status = NetworkStatus::PacketLoss;
-                        return Err(e);
-                    }
+            } else {
+                // get signal strength
+                if let Some(s) = station.signal {
+                    let dbm = nl80211::parse_i8(&s);
+                    *strength_percent = dbm_to_percentage(dbm as i32);
+                    self.status = NetworkStatus::Connected;
+                } else {
+                    // if no signal, disconnected maybe?
+                    self.status = NetworkStatus::Disconnected;
                 }
             }
-            NetworkStatus::Disconnected | NetworkStatus::Disabled => {
-                // ensure that the ssid is set to None if we're disconnected or disabled
-                self.ssid = None;
-            }
-            _ => {}
+        }
+
+        // check for packet if we're connected
+        if matches!(self.status, NetworkStatus::Connected) && self.packet_loss()? {
+            self.status = NetworkStatus::PacketLoss;
         }
 
         Ok(())
@@ -192,9 +166,7 @@ impl Block for NetworkBlock {
     }
 
     fn output(&self) -> Option<BlockOutput> {
-        let icon = self
-            .icons
-            .get_wireless_icon(&self.status, self.strength_percent);
+        let icon = self.icons.get_from_status(&self.iface_type, &self.status);
         match &self.status {
             NetworkStatus::Disconnected | NetworkStatus::Unknown | NetworkStatus::Disabled => {
                 // 'dim' statuses; disconnected or otherwise
@@ -206,26 +178,34 @@ impl Block for NetworkBlock {
                     Attention::Dim,
                 ))
             }
-            NetworkStatus::Connected | NetworkStatus::PacketLoss => {
-                let text = if let Some(ssid) = &self.ssid {
-                    if let Some(status) = self.status.to_string() {
-                        // we have both ssid and status, so we can do a pair
-                        BlockText::Pair(ssid.to_owned(), status)
-                    } else {
-                        // if no status, we'll just do ssid. it's okay
-                        BlockText::Single(ssid.to_owned())
-                    }
-                } else {
-                    // if no ssid, we'll count on `status` to give us something
-                    BlockText::Single(self.status.to_string().unwrap_or_default())
-                };
-                Some(BlockOutput::new(
+            NetworkStatus::Connected | NetworkStatus::PacketLoss => match &self.iface_type {
+                NetworkType::Wired => Some(BlockOutput::new(
                     self.name(),
                     Some(icon),
-                    text,
+                    BlockText::Single(self.status.to_string().unwrap_or_default()),
                     Attention::Normal,
-                ))
-            }
+                )),
+                NetworkType::Wireless { ssid, .. } => {
+                    let text = if let Some(ssid) = &ssid {
+                        if let Some(status) = self.status.to_string() {
+                            // we have both ssid and status, so we can do a pair
+                            BlockText::Pair(ssid.to_owned(), status)
+                        } else {
+                            // if no status, we'll just do ssid. it's okay
+                            BlockText::Single(ssid.to_owned())
+                        }
+                    } else {
+                        // if no ssid, we'll count on `status` to give us something
+                        BlockText::Single(self.status.to_string().unwrap_or_default())
+                    };
+                    Some(BlockOutput::new(
+                        self.name(),
+                        Some(icon),
+                        text,
+                        Attention::Normal,
+                    ))
+                }
+            },
             _ => None,
         }
     }
