@@ -1,13 +1,17 @@
-use crate::errors::*;
-use crate::format::blocks::*;
-use crate::format::Attention;
-use crate::format::blocks::output::BlockText;
+use crate::{
+    errors::*,
+    format::{
+        blocks::{output::BlockText, Block, BlockOutput, NextUpdate},
+        Attention,
+    },
+};
 use chrono::Duration;
 use nl80211::Socket;
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::Command;
-use std::process::Stdio;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+};
 
 use self::icons::NetworkIcons;
 
@@ -65,10 +69,12 @@ impl NetworkBlock {
             .stdout(Stdio::null())
             .status();
 
-        let is_success = ping_cmd_status.map_err(|e| UpdateError {
-            block_name: self.name().to_string(),
-            message: format!("couldn't execute `ping`: {}", e),
-        })?.success();
+        let is_success = ping_cmd_status
+            .map_err(|e| UpdateError {
+                block_name: self.name().to_string(),
+                message: format!("couldn't execute `ping`: {}", e),
+            })?
+            .success();
 
         Ok(!is_success)
     }
@@ -186,12 +192,19 @@ impl Block for NetworkBlock {
     }
 
     fn output(&self) -> Option<BlockOutput> {
-        let icon = self.icons.get_wireless_icon(&self.status, self.strength_percent);
+        let icon = self
+            .icons
+            .get_wireless_icon(&self.status, self.strength_percent);
         match &self.status {
             NetworkStatus::Disconnected | NetworkStatus::Unknown | NetworkStatus::Disabled => {
                 // 'dim' statuses; disconnected or otherwise
                 let text = BlockText::Single(self.status.to_string().unwrap_or_default());
-                Some(BlockOutput::new(self.name(), Some(icon), text, Attention::Dim))
+                Some(BlockOutput::new(
+                    self.name(),
+                    Some(icon),
+                    text,
+                    Attention::Dim,
+                ))
             }
             NetworkStatus::Connected | NetworkStatus::PacketLoss => {
                 let text = if let Some(ssid) = &self.ssid {
@@ -206,7 +219,12 @@ impl Block for NetworkBlock {
                     // if no ssid, we'll count on `status` to give us something
                     BlockText::Single(self.status.to_string().unwrap_or_default())
                 };
-                Some(BlockOutput::new(self.name(), Some(icon), text, Attention::Normal))
+                Some(BlockOutput::new(
+                    self.name(),
+                    Some(icon),
+                    text,
+                    Attention::Normal,
+                ))
             }
             _ => None,
         }
