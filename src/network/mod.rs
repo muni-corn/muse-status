@@ -11,17 +11,25 @@ use std::process::Stdio;
 
 use self::icons::NetworkIcons;
 
+/// Module for all sorts of network icons.
 pub mod icons;
 
+/// Whether a network interface is wired (Ethernet) or wireless (WiFi).
 pub enum NetworkType {
+    /// The network interface is wired.
     Wired,
+
+    /// The network interface is wireless.
     Wireless {
+        /// The name of the access point.
         ssid: Option<String>,
+
+        /// The wireless connection strength from 0 to 100.
         strength_percent: i32,
     },
 }
 
-/// A block that transmits wireless interface data.
+/// A block that transmits network interface data.
 pub struct NetworkBlock {
     iface_name: String,
 
@@ -254,10 +262,10 @@ fn dbm_to_percentage(mut dbm: i32) -> i32 {
 /// NetworkStatus represents the state of a wireless interface.
 #[derive(PartialEq)]
 pub enum NetworkStatus {
-    /// Wireless interfaces are enabled, but there is no connection to the internet.
+    /// The interface is enabled, but there is no connection to the internet.
     Disconnected,
 
-    /// The device is connected to an access point, but packets are being lost.
+    /// The device has a connection, but packets are being lost.
     PacketLoss,
 
     /// The device is trying to connect to the internet.
@@ -269,16 +277,16 @@ pub enum NetworkStatus {
     /// The device is connected to the internet through a VPN.
     Vpn,
 
-    /// The access point requires login information.
+    /// The access point requires login information (captive portal).
     SignInRequired,
 
-    /// Wireless interfaces are disabled.
+    /// The interface is disabled.
     Disabled,
 
     /// The connection speed is slow.
     Slow,
 
-    /// The connection signal strength is weak.
+    /// The wireless connection signal strength is weak.
     Weak,
 
     /// The status of the device is unknown.
