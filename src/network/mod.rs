@@ -37,6 +37,7 @@ pub enum NetworkType {
 pub struct NetworkBlock {
     iface_name: String,
     iface_type: NetworkType,
+    sys_path: PathBuf,
     status: NetworkStatus,
     icons: NetworkIcons,
 }
@@ -58,6 +59,8 @@ impl NetworkBlock {
             iface_type: get_interface_type(iface_name),
             status: NetworkStatus::Unknown,
             icons: NetworkIcons::default(),
+
+            sys_path,
         };
 
         Ok(block)
@@ -85,14 +88,19 @@ impl NetworkBlock {
         Ok(!is_success)
     }
 
-    fn get_ip_link_show(&self) -> Result<String, UpdateError> {
-        let mut cmd = Command::new("ip");
-        cmd.args(&["link", "show", &self.iface_name]);
-        let stdout = cmd.output().map(|o| o.stdout).map_err(|e| UpdateError {
-            block_name: self.name().to_string(),
-            message: format!("there was a problem executing `ip`: {}", e),
-        })?;
-        Ok(String::from_utf8_lossy(&stdout).into_owned())
+    /// Returns true if the network is connected to a VPN (wireguard, ppp, tun).
+    fn is_network_secured(&self) -> Result<bool, UpdateError> {
+        if self.iface_name.starts_with("tun") || self.iface_name.starts_with("tap") || self.sys_path.join("tun_flags").exists() {
+            Ok(true)
+        } else {
+            let uevent_path = self.sys_path.join("uevent");
+            let uevent = fs::read_to_string(uevent_path).map_err(|e| UpdateError {
+                block_name: self.name().to_owned(),
+                message: format!("couldn't get network iface uevent data: {}", e),
+            })?;
+
+            Ok(uevent.contains("wireguard") || uevent.contains("ppp"))
+        }
     }
 }
 
@@ -153,9 +161,11 @@ impl Block for NetworkBlock {
             }
         }
 
-        // check for packet if we're connected
+        // check for packet loss and/or vpn if we're connected
         if matches!(self.status, NetworkStatus::Connected) && self.packet_loss()? {
             self.status = NetworkStatus::PacketLoss;
+        } else if self.is_network_secured()? {
+            self.status = NetworkStatus::Vpn;
         }
 
         Ok(())
