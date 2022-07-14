@@ -105,6 +105,30 @@ impl NetworkBlock {
             Ok(uevent.contains("wireguard") || uevent.contains("ppp"))
         }
     }
+
+    /// Returns true if the file content at `/sys/class/{iface_name}/{file_name}` matches
+    /// `up_value`. Special thanks to i3status-rust's source code for guidance here.
+    fn is_up_according_to_file(
+        &self,
+        file_name: &str,
+        up_value: &str,
+    ) -> Result<bool, UpdateError> {
+        let file = self.sys_path.join(file_name);
+        if !file.exists() {
+            // consider down if file doesn't even exist
+            return Ok(false);
+        }
+
+        let value = fs::read_to_string(&file).map_err(|e| UpdateError {
+            block_name: self.name().to_string(),
+            message: format!(
+                "couldn't read {}'s {} file: {}",
+                self.iface_name, file_name, e
+            ),
+        })?;
+
+        Ok(value.trim() == up_value.trim())
+    }
 }
 
 fn get_interface_type<P: AsRef<Path>>(iface_path: P) -> NetworkType {
