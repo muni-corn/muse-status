@@ -129,6 +129,14 @@ impl NetworkBlock {
 
         Ok(value.trim() == up_value.trim())
     }
+
+    /// Returns true if the network is "up", or false otherwise.
+    fn is_up(&self) -> Result<bool, UpdateError> {
+        let is_operstate_up = self.is_up_according_to_file("operstate", "up")?;
+        let is_carrier_up = self.is_up_according_to_file("carrier", "1")?;
+
+        Ok(is_operstate_up || is_carrier_up)
+    }
 }
 
 fn get_interface_type<P: AsRef<Path>>(iface_path: P) -> NetworkType {
