@@ -196,6 +196,26 @@ impl NetworkBlock {
             })
         }
     }
+
+    fn update_wired(&mut self) -> Result<(), UpdateError> {
+        if matches!(self.iface_type, NetworkType::Wired) {
+            if self.is_up()? {
+                self.status = NetworkStatus::Connected;
+            } else {
+                self.status = NetworkStatus::Disconnected;
+            }
+
+            Ok(())
+        } else {
+            Err(UpdateError {
+                block_name: self.name().to_string(),
+                message: format!(
+                    "`update_wired` was called on a non-wired network interface {}",
+                    self.iface_name
+                ),
+            })
+        }
+    }
 }
 
 fn get_interface_type<P: AsRef<Path>>(iface_path: P) -> NetworkType {
