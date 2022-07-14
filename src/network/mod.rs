@@ -90,7 +90,10 @@ impl NetworkBlock {
 
     /// Returns true if the network is connected to a VPN (wireguard, ppp, tun).
     fn is_network_secured(&self) -> Result<bool, UpdateError> {
-        if self.iface_name.starts_with("tun") || self.iface_name.starts_with("tap") || self.sys_path.join("tun_flags").exists() {
+        if self.iface_name.starts_with("tun")
+            || self.iface_name.starts_with("tap")
+            || self.sys_path.join("tun_flags").exists()
+        {
             Ok(true)
         } else {
             let uevent_path = self.sys_path.join("uevent");

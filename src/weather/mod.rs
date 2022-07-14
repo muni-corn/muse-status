@@ -192,7 +192,9 @@ impl Block for WeatherBlock {
     }
 
     fn next_update(&self) -> Option<NextUpdate> {
-        Some(NextUpdate::In(Duration::minutes(self.config.update_interval_minutes.into())))
+        Some(NextUpdate::In(Duration::minutes(
+            self.config.update_interval_minutes.into(),
+        )))
     }
 }
 
