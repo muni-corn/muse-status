@@ -1,5 +1,6 @@
 use super::{NetworkStatus, NetworkType};
 
+/// Icons to be used with the `NetworkBlock`.
 #[derive(Default)]
 pub struct NetworkIcons {
     wireless: WirelessIcons,
@@ -7,10 +8,12 @@ pub struct NetworkIcons {
 }
 
 impl NetworkIcons {
+    /// Returns a wireless icon according to the wireless interface's status and signal strength.
     pub fn get_wireless_icon(&self, status: &NetworkStatus, strength_percent: i32) -> char {
         self.wireless.get_icon(status, strength_percent)
     }
 
+    /// Returns an icon according to the interface type and the status of its connection.
     pub fn get_from_status(&self, net_type: &NetworkType, status: &NetworkStatus) -> char {
         match net_type {
             NetworkType::Wired => self.wired.get_icon(status),
@@ -21,6 +24,7 @@ impl NetworkIcons {
     }
 }
 
+/// Wireless network icons.
 pub struct WirelessIcons {
     connection_icons: Vec<char>,
     packet_loss_icons: Vec<char>,
@@ -62,6 +66,7 @@ impl Default for WirelessIcons {
 }
 
 impl WirelessIcons {
+    /// Gets a wireless icon according to the status and signal strength of the interface.
     pub fn get_icon(&self, status: &NetworkStatus, strength_percent: i32) -> char {
         match status {
             NetworkStatus::Disconnected => self.disconnected_icon,
@@ -90,6 +95,7 @@ impl WirelessIcons {
     }
 }
 
+/// Wired network icons.
 pub struct WiredIcons {
     connection_icon: char,
     packet_loss_icon: char,
@@ -111,6 +117,7 @@ impl Default for WiredIcons {
 }
 
 impl WiredIcons {
+    /// Gets a wired icon according to the status of the interface.
     pub fn get_icon(&self, status: &NetworkStatus) -> char {
         match status {
             NetworkStatus::Disconnected | NetworkStatus::PacketLoss => self.packet_loss_icon,
