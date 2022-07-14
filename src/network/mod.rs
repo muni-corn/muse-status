@@ -8,6 +8,7 @@ use crate::{
 use chrono::Duration;
 use nl80211::Socket;
 use std::{
+    fmt::Display,
     fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -263,7 +264,7 @@ impl Block for NetworkBlock {
         match &self.status {
             NetworkStatus::Disconnected | NetworkStatus::Unknown | NetworkStatus::Disabled => {
                 // 'dim' statuses; disconnected or otherwise
-                let text = BlockText::Single(self.status.to_string().unwrap_or_default());
+                let text = BlockText::Single(self.status.to_string());
                 Some(BlockOutput::new(
                     self.name(),
                     Some(icon),
@@ -275,21 +276,16 @@ impl Block for NetworkBlock {
                 NetworkType::Wired => Some(BlockOutput::new(
                     self.name(),
                     Some(icon),
-                    BlockText::Single(self.status.to_string().unwrap_or_default()),
+                    BlockText::Single(self.status.to_string()),
                     Attention::Normal,
                 )),
                 NetworkType::Wireless { ssid, .. } => {
                     let text = if let Some(ssid) = &ssid {
-                        if let Some(status) = self.status.to_string() {
-                            // we have both ssid and status, so we can do a pair
-                            BlockText::Pair(ssid.to_owned(), status)
-                        } else {
-                            // if no status, we'll just do ssid. it's okay
-                            BlockText::Single(ssid.to_owned())
-                        }
+                        // we have both ssid and status, so we can do a pair
+                        BlockText::Pair(ssid.to_owned(), self.status.to_string())
                     } else {
                         // if no ssid, we'll count on `status` to give us something
-                        BlockText::Single(self.status.to_string().unwrap_or_default())
+                        BlockText::Single(self.status.to_string())
                     };
                     Some(BlockOutput::new(
                         self.name(),
@@ -384,20 +380,22 @@ pub enum NetworkStatus {
     Unknown,
 }
 
-impl NetworkStatus {
-    fn to_string(&self) -> Option<String> {
-        match self {
-            Self::Disconnected => Some(String::from("Not connected")),
-            Self::PacketLoss => Some(String::from("No Internet")),
-            Self::Connecting => Some(String::from("Connecting")),
-            Self::Connected => Some(String::from("Connected")),
-            Self::SignInRequired => Some(String::from("Sign-in required")),
-            Self::Disabled => Some(String::from("Off")),
-            Self::Slow => Some(String::from("Slow")),
-            Self::Weak => Some(String::from("Weak")),
-            Self::Vpn => Some(String::from("Secured")),
-            Self::Unknown => Some(String::from("Status unknown")),
-        }
+impl Display for NetworkStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Disconnected => "Not connected",
+            Self::PacketLoss => "No Internet",
+            Self::Connecting => "Connecting",
+            Self::Connected => "Connected",
+            Self::SignInRequired => "Sign-in required",
+            Self::Disabled => "Off",
+            Self::Slow => "Slow",
+            Self::Weak => "Weak",
+            Self::Vpn => "Secured",
+            Self::Unknown => "Status unknown",
+        };
+
+        f.write_str(s)
     }
 }
 
