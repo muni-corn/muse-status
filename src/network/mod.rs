@@ -149,7 +149,7 @@ impl NetworkBlock {
         } = &mut self.iface_type
         {
             // get interface
-            let iface = get_interface(&self.iface_name).map_err(|e| {
+            let iface = get_wireless_interface(&self.iface_name).map_err(|e| {
                 // set status to unknown if there's an error
                 self.status = NetworkStatus::Unknown;
 
@@ -316,8 +316,8 @@ impl Block for NetworkBlock {
 }
 
 // only returns one interface that matches the name given
-fn get_interface(interface_name: &str) -> Result<nl80211::Interface, BasicError> {
-    // get all interfaces
+fn get_wireless_interface(interface_name: &str) -> Result<nl80211::Interface, BasicError> {
+    // get all wireless interfaces
     let interfaces = match Socket::connect() {
         Ok(mut s) => match s.get_interfaces_info() {
             Ok(i) => i,
