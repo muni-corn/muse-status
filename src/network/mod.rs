@@ -137,6 +137,65 @@ impl NetworkBlock {
 
         Ok(is_operstate_up || is_carrier_up)
     }
+
+    fn update_wireless(&mut self) -> Result<(), UpdateError> {
+        // have block name ready in case of errors
+        let block_name = self.name().to_string();
+
+        // if wireless, update ssid and strength
+        if let NetworkType::Wireless {
+            ssid,
+            strength_percent,
+        } = &mut self.iface_type
+        {
+            // get interface
+            let iface = get_interface(&self.iface_name).map_err(|e| {
+                // set status to unknown if there's an error
+                self.status = NetworkStatus::Unknown;
+
+                UpdateError {
+                    block_name: block_name.clone(),
+                    message: format!("couldn't get interface: {}", e),
+                }
+            })?;
+
+            // get station
+            let station = iface.get_station_info().map_err(|e| {
+                // set status to unknown if there's an error
+                self.status = NetworkStatus::Unknown;
+
+                UpdateError {
+                    block_name,
+                    message: format!("{}", e),
+                }
+            })?;
+
+            *ssid = iface.ssid.map(|val| nl80211::parse_string(&val));
+            if ssid.is_none() {
+                self.status = NetworkStatus::Disconnected;
+            } else {
+                // get signal strength
+                if let Some(s) = station.signal {
+                    let dbm = nl80211::parse_i8(&s);
+                    *strength_percent = dbm_to_percentage(dbm as i32);
+                    self.status = NetworkStatus::Connected;
+                } else {
+                    // if no signal, disconnected maybe?
+                    self.status = NetworkStatus::Disconnected;
+                }
+            }
+
+            Ok(())
+        } else {
+            Err(UpdateError {
+                block_name,
+                message: format!(
+                    "`update_wireless` was called on a non-wireless network interface {}",
+                    self.iface_name
+                ),
+            })
+        }
+    }
 }
 
 fn get_interface_type<P: AsRef<Path>>(iface_path: P) -> NetworkType {
