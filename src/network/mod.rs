@@ -390,7 +390,7 @@ impl NetworkStatus {
             Self::Disconnected => Some(String::from("Not connected")),
             Self::PacketLoss => Some(String::from("No Internet")),
             Self::Connecting => Some(String::from("Connecting")),
-            Self::Connected => None,
+            Self::Connected => Some(String::from("Connected")),
             Self::SignInRequired => Some(String::from("Sign-in required")),
             Self::Disabled => Some(String::from("Off")),
             Self::Slow => Some(String::from("Slow")),
