@@ -237,49 +237,18 @@ impl Block for NetworkBlock {
 
     // Updates the network information
     fn update(&mut self) -> Result<(), UpdateError> {
-        // get interface
-        let iface = get_interface(&self.iface_name).map_err(|e| {
-            self.status = NetworkStatus::Unknown;
-
-            UpdateError {
-                block_name: self.name().to_string(),
-                message: format!("couldn't get interface: {}", e),
-            }
-        })?;
-
-        // get station
-        let station = iface.get_station_info().map_err(|e| UpdateError {
-            block_name: self.name().to_string(),
-            message: format!("{}", e),
-        })?;
-
-        // if wireless, update ssid and strength
-        if let NetworkType::Wireless {
-            ssid,
-            strength_percent,
-        } = &mut self.iface_type
-        {
-            *ssid = iface.ssid.map(|val| nl80211::parse_string(&val));
-            if ssid.is_none() {
-                self.status = NetworkStatus::Disconnected;
-            } else {
-                // get signal strength
-                if let Some(s) = station.signal {
-                    let dbm = nl80211::parse_i8(&s);
-                    *strength_percent = dbm_to_percentage(dbm as i32);
-                    self.status = NetworkStatus::Connected;
-                } else {
-                    // if no signal, disconnected maybe?
-                    self.status = NetworkStatus::Disconnected;
-                }
-            }
+        match self.iface_type {
+            NetworkType::Wired => self.update_wired()?,
+            NetworkType::Wireless { .. } => self.update_wireless()?,
         }
 
         // check for packet loss and/or vpn if we're connected
-        if matches!(self.status, NetworkStatus::Connected) && self.packet_loss()? {
-            self.status = NetworkStatus::PacketLoss;
-        } else if self.is_network_secured()? {
-            self.status = NetworkStatus::Vpn;
+        if matches!(self.status, NetworkStatus::Connected) {
+            if self.packet_loss()? {
+                self.status = NetworkStatus::PacketLoss;
+            } else if self.is_network_secured()? {
+                self.status = NetworkStatus::Vpn;
+            }
         }
 
         Ok(())
