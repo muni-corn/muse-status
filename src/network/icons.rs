@@ -8,11 +8,6 @@ pub struct NetworkIcons {
 }
 
 impl NetworkIcons {
-    /// Returns a wireless icon according to the wireless interface's status and signal strength.
-    pub fn get_wireless_icon(&self, status: &NetworkStatus, strength_percent: i32) -> char {
-        self.wireless.get_icon(status, strength_percent)
-    }
-
     /// Returns an icon according to the interface type and the status of its connection.
     pub fn get_from_status(&self, net_type: &NetworkType, status: &NetworkStatus) -> char {
         match net_type {
