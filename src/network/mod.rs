@@ -57,7 +57,7 @@ impl NetworkBlock {
         // then we can create the block
         let block = Self {
             iface_name: String::from(iface_name),
-            iface_type: get_interface_type(iface_name),
+            iface_type: get_interface_type(&sys_path),
             status: NetworkStatus::Unknown,
             icons: NetworkIcons::default(),
 
