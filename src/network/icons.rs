@@ -73,20 +73,17 @@ impl WirelessIcons {
             NetworkStatus::Disabled => self.disabled_icon,
             NetworkStatus::Unknown => self.unknown_icon,
             _ => {
-                // determine which icons we'll use based on
-                // packet loss or vpn status
-                let icons = if let NetworkStatus::PacketLoss = status {
-                    &self.packet_loss_icons
-                } else if let NetworkStatus::Vpn = status {
-                    &self.vpn_icons
-                } else {
-                    &self.connection_icons
+                // determine which icon set we'll use based on packet loss or vpn status
+                let icons = match status {
+                    NetworkStatus::PacketLoss => &self.packet_loss_icons,
+                    NetworkStatus::Vpn => &self.vpn_icons,
+                    _ => &self.connection_icons,
                 };
 
                 // get the icon
                 let mut icon_index: usize = (icons.len() as i32 * strength_percent / 100) as usize;
 
-                // constrains index
+                // constrain index
                 icon_index = icon_index.min(icons.len() - 1);
 
                 icons[icon_index]
