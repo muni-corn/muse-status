@@ -281,8 +281,14 @@ impl Block for NetworkBlock {
                 )),
                 NetworkType::Wireless { ssid, .. } => {
                     let text = if let Some(ssid) = &ssid {
-                        // we have both ssid and status, so we can do a pair
-                        BlockText::Pair(ssid.to_owned(), self.status.to_string())
+                        // we have both ssid and status, so we can do a pair, but only if the
+                        // status is something besides `Connected` (it's kinda redundant to show
+                        // `Connected` and it's nice to save space on a status bar)
+                        if !matches!(self.status, NetworkStatus::Connected) {
+                            BlockText::Pair(ssid.to_owned(), self.status.to_string())
+                        } else {
+                            BlockText::Single(ssid.to_owned())
+                        }
                     } else {
                         // if no ssid, we'll count on `status` to give us something
                         BlockText::Single(self.status.to_string())
