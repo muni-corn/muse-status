@@ -130,7 +130,7 @@ impl VolumeBlock {
     /// Gets the system volume from the `amixer` command
     fn volume_from_amixer(&self) -> Result<Volume, UpdateError> {
         let raw_string_opt = Command::new("amixer")
-            .args(&["sget", "Master"])
+            .args(["sget", "Master"])
             .output()
             .map(|output| {
                 String::from_utf8(output.stdout)
@@ -157,7 +157,7 @@ impl VolumeBlock {
                         // volume amount
                         let raw_percent = line_end
                             .chars()
-                            .filter(|c| c.is_digit(10))
+                            .filter(|c| c.is_ascii_digit())
                             .collect::<String>();
 
                         let current_volume =
@@ -254,7 +254,12 @@ impl Block for VolumeBlock {
     }
 
     fn output(&self) -> Option<BlockOutput> {
-        Some(BlockOutput::new(self.name(), Some(self.get_icon()), BlockText::Single(self.get_text()), Attention::Dim))
+        Some(BlockOutput::new(
+            self.name(),
+            Some(self.get_icon()),
+            BlockText::Single(self.get_text()),
+            Attention::Dim,
+        ))
     }
 }
 

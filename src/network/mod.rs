@@ -47,7 +47,7 @@ impl NetworkBlock {
     /// Returns a new NetworkBlock.
     pub fn new(iface_name: &str) -> Result<Self, MuseStatusError> {
         // first, make sure the path to this interface exists
-        let sys_path = Path::new("/sys/class/net").join(&iface_name);
+        let sys_path = Path::new("/sys/class/net").join(iface_name);
         if !sys_path.exists() {
             return Err(MuseStatusError::Basic(BasicError {
                 message: format!("network interface `{iface_name}` doesn't exist on this system"),
@@ -346,7 +346,7 @@ const NOISE_FLOOR_DBM: i32 = -80;
 
 // thank u to i3status and NetworkManager :)
 fn dbm_to_percentage(mut dbm: i32) -> i32 {
-    dbm = dbm.max(NOISE_FLOOR_DBM).min(SIGNAL_MAX_DBM);
+    dbm = dbm.clamp(NOISE_FLOOR_DBM, SIGNAL_MAX_DBM);
     let dbm_f = dbm as f64;
 
     (-0.04 * (dbm_f + 30.0).powi(2) + 100.0) as i32

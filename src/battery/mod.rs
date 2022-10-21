@@ -224,7 +224,7 @@ impl BatteryBlock {
     /// Returns the time at which the battery will be either fully charged or completely depleted.
     fn get_completion_time(&self) -> Option<DateTime<Local>> {
         self.get_nanos_left()
-            .map(|n| Local::now() + Duration::nanoseconds(n as i64))
+            .map(|n| Local::now() + Duration::nanoseconds(n))
     }
 
     /// Returns true if the battery is at or below the warning level. If no current battery reading
@@ -328,7 +328,12 @@ impl Block for BatteryBlock {
                 } else {
                     BlockText::Single(primary_text)
                 };
-                Some(BlockOutput::new(self.name(), Some(icon), block_text, attention))
+                Some(BlockOutput::new(
+                    self.name(),
+                    Some(icon),
+                    block_text,
+                    attention,
+                ))
             }
             None => None,
         }
@@ -433,12 +438,12 @@ fn get_battery_icon(status: &ChargeStatus, percentage: i32) -> char {
         ChargeStatus::Charging => {
             let charging_index = ((percentage * CHARGING_ICONS.len() as i32 / 100) as usize)
                 .min(CHARGING_ICONS.len() - 1);
-            CHARGING_ICONS[charging_index as usize]
+            CHARGING_ICONS[charging_index]
         }
         ChargeStatus::Discharging => {
             let discharging_index = ((percentage * DISCHARGING_ICONS.len() as i32 / 100) as usize)
                 .min(DISCHARGING_ICONS.len() - 1);
-            DISCHARGING_ICONS[discharging_index as usize]
+            DISCHARGING_ICONS[discharging_index]
         }
         ChargeStatus::Full => FULL_ICON,
         _ => UNKNOWN_ICON,

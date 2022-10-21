@@ -94,9 +94,14 @@ impl Block for BrightnessBlock {
         }
 
         let percent = self.current_brightness * 100 / self.max_brightness;
-        let icon = get_icon(percent as u32);
+        let icon = get_icon(percent);
         let block_text = BlockText::Single(format!("{}%", percent));
-        Some(BlockOutput::new(self.name(), Some(icon), block_text, Attention::Dim))
+        Some(BlockOutput::new(
+            self.name(),
+            Some(icon),
+            block_text,
+            Attention::Dim,
+        ))
     }
 }
 

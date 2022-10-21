@@ -326,7 +326,7 @@ impl Formatter {
         // zero to one, calculated by `unix_millis / max_millis`
         let max_millis: u64 = (1000.0 * seconds) as u64;
         let unix_millis: u128 = (now.timestamp_nanos() as u128
-            / Duration::from_millis(1).as_nanos() as u128)
+            / Duration::from_millis(1).as_nanos())
             % max_millis as u128;
         let interpolation = utils::cubic_ease_arc((unix_millis / max_millis as u128) as f32);
 

@@ -73,7 +73,12 @@ impl Block for DateBlock {
         let date = format!("{}", self.now.format(DATE_FORMAT));
         let text = BlockText::Pair(time, date);
 
-        Some(BlockOutput::new(self.name(), Some(icon), text, Attention::Normal))
+        Some(BlockOutput::new(
+            self.name(),
+            Some(icon),
+            text,
+            Attention::Normal,
+        ))
     }
 }
 

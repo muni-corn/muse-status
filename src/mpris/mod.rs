@@ -1,6 +1,6 @@
 use crate::errors::*;
 use crate::format::blocks::output::{BlockOutput, BlockText};
-use crate::format::blocks::{Block, NextUpdate, BlockOutputMsg};
+use crate::format::blocks::{Block, BlockOutputMsg, NextUpdate};
 use crate::format::Attention;
 use mpris as mpris_lib;
 use std::sync::mpsc::Sender;
@@ -49,7 +49,7 @@ impl MprisBlock {
         self.title = metadata.title().map(String::from);
 
         self.artist = if let Some(av) = metadata.album_artists() {
-            av.get(0).map(|first_artist| first_artist.to_string())
+            av.first().map(|first_artist| first_artist.to_string())
         } else {
             None
         };
@@ -185,8 +185,13 @@ impl Block for MprisBlock {
                     // use some generic default string
                     BlockText::Single(String::from("Media is playing"))
                 };
-                Some(BlockOutput::new(self.name(), Some(self.get_icon()), text, Attention::Normal))
-            },
+                Some(BlockOutput::new(
+                    self.name(),
+                    Some(self.get_icon()),
+                    text,
+                    Attention::Normal,
+                ))
+            }
         }
     }
 }

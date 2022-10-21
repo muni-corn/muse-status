@@ -2,8 +2,8 @@ use crate::{
     errors::*,
     format::{color::RGBA, Mode},
 };
-use std::{fs, borrow::Cow};
 use std::path::Path;
+use std::{borrow::Cow, fs};
 
 /// Returns a number in a file
 pub fn get_int_from_file(filepath: &Path) -> Result<i32, MuseStatusError> {
@@ -23,11 +23,7 @@ pub fn cubic_ease_arc(mut x: f32) -> f32 {
 
 /// Creates a Pango string from the text. The text is colored with `rgba` if it's `Some` and sets
 /// the font to `font` if it is `Some`.
-pub fn make_pango_string(
-    text: &str,
-    rgba: Option<RGBA>,
-    font: Option<&str>,
-) -> String {
+pub fn make_pango_string(text: &str, rgba: Option<RGBA>, font: Option<&str>) -> String {
     let escaped = xml_escape(text);
     match rgba {
         Some(c) => {

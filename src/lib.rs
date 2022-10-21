@@ -1,6 +1,5 @@
 //! muse-status needs documentation
 
-#![feature(vec_retain_mut)]
 #![warn(missing_docs)]
 #![deny(unused_variables)]
 #![deny(clippy::shadow_unrelated)]

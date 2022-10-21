@@ -31,7 +31,7 @@ pub struct BlockOutputMsg {
     name: String,
 
     /// The output of the block. If None, the block is (temporarily) removed from the status bar
-    data: Option<BlockOutput>
+    data: Option<BlockOutput>,
 }
 
 impl BlockOutputMsg {
@@ -65,7 +65,10 @@ pub trait Block: Send + Sync {
     /// block name specified (or whatever string is sent through). The `Block`, which should be
     /// listening with a partnered `Receiver` in a different thread, can handle this data as it
     /// pleases.
-    fn run(self: Box<Self>, block_sender: Sender<BlockOutputMsg>) -> (Vec<JoinHandle<()>>, Sender<()>)
+    fn run(
+        self: Box<Self>,
+        block_sender: Sender<BlockOutputMsg>,
+    ) -> (Vec<JoinHandle<()>>, Sender<()>)
     where
         Self: 'static,
     {
@@ -92,7 +95,7 @@ pub trait Block: Send + Sync {
                     if let Err(e) = block.update() {
                         println!("{}", e)
                     }
-                    let _ = block_sender.send(BlockOutputMsg::new(block.name(),block.output()));
+                    let _ = block_sender.send(BlockOutputMsg::new(block.name(), block.output()));
 
                     block.next_update()
                 };

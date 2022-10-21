@@ -86,10 +86,14 @@ impl WeatherBlock {
     }
 
     fn get_weather_icon(&self, report: &FullWeatherReport) -> char {
-        report.weather.first().map(|r| {
-            let icon_string = &r.icon;
-            self.config.weather_icons[icon_string]
-        }).unwrap_or(self.config.default_icon)
+        report
+            .weather
+            .first()
+            .map(|r| {
+                let icon_string = &r.icon;
+                self.config.weather_icons[icon_string]
+            })
+            .unwrap_or(self.config.default_icon)
     }
 
     fn update_current_report(&mut self) -> Result<(), UpdateError> {
@@ -153,15 +157,11 @@ impl Block for WeatherBlock {
         let mut wait_time_seconds = 1;
 
         // continually try to update with exponential falloff until we have a successful update
-        loop {
-            if let Err(e) = self.update_current_report() {
-                eprintln!(
-                    "couldn't update weather: {}. trying again in {} seconds",
-                    e, wait_time_seconds
-                )
-            } else {
-                break;
-            }
+        while let Err(e) = self.update_current_report() {
+            eprintln!(
+                "couldn't update weather: {}. trying again in {} seconds",
+                e, wait_time_seconds
+            );
 
             std::thread::sleep(std::time::Duration::from_secs(wait_time_seconds));
 
@@ -187,7 +187,12 @@ impl Block for WeatherBlock {
             } else {
                 BlockText::Single(temp_string)
             };
-            BlockOutput::new(self.name(), Some(self.get_weather_icon(r)), text, Attention::Normal)
+            BlockOutput::new(
+                self.name(),
+                Some(self.get_weather_icon(r)),
+                text,
+                Attention::Normal,
+            )
         })
     }
 

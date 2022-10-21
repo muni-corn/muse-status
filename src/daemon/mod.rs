@@ -161,14 +161,13 @@ impl Daemon {
             #[cfg(debug_assertions)]
             println!(
                 "received block update from {}: {:?}",
-                msg.name(), msg.data()
+                msg.name(),
+                msg.data()
             );
 
             let mut daemon = daemon_arc.lock().unwrap();
             if let Some(output) = msg.data() {
-                daemon
-                    .block_outputs
-                    .insert(msg.name(), output);
+                daemon.block_outputs.insert(msg.name(), output);
             } else {
                 daemon.block_outputs.remove(&msg.name());
             }
@@ -286,8 +285,8 @@ impl Daemon {
     fn force_send_data(&self, sub: &mut Subscriber) -> Result<(), MuseStatusError> {
         let all_outputs = self
             .block_outputs
-            .iter()
-            .map(|(_, v)| v.to_owned())
+            .values()
+            .map(|v| v.to_owned())
             .collect::<Vec<BlockOutput>>();
         let msg = DaemonMsg::AllData(all_outputs);
         send_serialized_data(sub, &serde_json::to_string(&msg)?)
@@ -447,7 +446,10 @@ impl DataPayload {
     }
 
     fn make_vec(names: &[String], outputs: &BlockOutputs) -> Vec<BlockOutput> {
-        names.iter().filter_map(|name| outputs.get(name).cloned()).collect()
+        names
+            .iter()
+            .filter_map(|name| outputs.get(name).cloned())
+            .collect()
     }
 }
 

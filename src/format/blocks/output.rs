@@ -21,12 +21,17 @@ pub struct BlockOutput {
 
 impl BlockOutput {
     /// Creates a new `BlockOutput`.
-    pub fn new(block_name: &str, icon: Option<char>, text: BlockText, attention: Attention) -> Self {
+    pub fn new(
+        block_name: &str,
+        icon: Option<char>,
+        text: BlockText,
+        attention: Attention,
+    ) -> Self {
         Self {
             block_name: block_name.to_string(),
             icon,
             text,
-            attention
+            attention,
         }
     }
 
@@ -45,7 +50,9 @@ impl BlockOutput {
     /// secondary text.
     pub fn as_pango_strings(&self, f: &Formatter) -> (String, Option<String>) {
         let (primary_color, secondary_color) = self.attention.colors(f);
-        let icon_pango = self.icon.map(|i| utils::make_pango_string(&i.to_string(), Some(primary_color), Some(&f.icon_font)));
+        let icon_pango = self.icon.map(|i| {
+            utils::make_pango_string(&i.to_string(), Some(primary_color), Some(&f.icon_font))
+        });
         let (full, short_opt) = self.text.to_pango_strings(primary_color, secondary_color);
         if let Some(icon) = icon_pango {
             // strings with icons
@@ -126,7 +133,7 @@ impl BlockText {
     fn to_short_pango_string(&self, primary_color: RGBA) -> Option<String> {
         match self {
             BlockText::Single(_) => None,
-            BlockText::Pair(p, _) => Some(utils::make_pango_string(p, Some(primary_color), None))
+            BlockText::Pair(p, _) => Some(utils::make_pango_string(p, Some(primary_color), None)),
         }
     }
 
