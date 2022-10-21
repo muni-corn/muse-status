@@ -29,7 +29,7 @@
             inherit (pkgs)
               dbus
               pkg-config
-              libressl;
+              libressl_3_5;
           };
           buildInputs = with pkgs; [ dbus pamixer alsa-utils iputils ];
 
