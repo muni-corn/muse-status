@@ -83,20 +83,19 @@ impl VolumeBlock {
         if muted {
             Ok(Volume::Off)
         } else {
-            let mut get_volume_command_args = vec!["--get-volume"];
-            if let Some(sink) = &self.volume_sink {
+            let get_volume_command_args = if let Some(sink) = &self.volume_sink {
                 #[cfg(debug_assertions)]
                 {
                     eprintln!("getting volume from sink '{}'", sink);
                 }
-                get_volume_command_args.push("--sink");
-                get_volume_command_args.push(sink);
+                vec!["--get-volume", "--sink", sink]
             } else {
                 #[cfg(debug_assertions)]
                 {
                     eprintln!("getting volume from default sink");
                 }
-            }
+                vec!["--get-volume"]
+            };
 
             let num = Command::new("pamixer")
                 .args(&get_volume_command_args)
