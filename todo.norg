@@ -9,25 +9,25 @@
 
 * modules
   - weather
-  -- [ ] use geoclue (or manual input) for location
+  -- ( ) use geoclue (or manual input) for location
   - battery
-  -- [ ] inotify watching for updates instead of polling
+  -- ( ) inotify watching for updates instead of polling
   - network
-  -- [ ] detect if wireless interface
-  -- [ ] detect vpn
-  -- [ ] detect captive portal
+  -- ( ) detect if wireless interface
+  -- ( ) detect vpn
+  -- ( ) detect captive portal
   - date
-  -- [x] maybe sleep thread for a maximum of 5 seconds
+  -- (x) maybe sleep thread for a maximum of 5 seconds
 
 * bugs
-  - [ ] fix error handling for client
-  -- [ ] indicate disconnection from daemon
+  - ( ) fix error handling for client
+  -- ( ) indicate disconnection from daemon
 
 * enhancements
-  - [ ] use features to exclude features for a more lightweight program
-  - [ ] client-side animations
+  - ( ) use features to exclude features for a more lightweight program
+  - ( ) client-side animations
   -- daemon sends animation instructions, client animates
-  - [x] instead of `next_update_time` that returns a datetime, let's do `next_update` that returns an enum:
+  - (x) instead of `next_update_time` that returns a datetime, let's do `next_update` that returns an enum:
     @code rust
       enum NextUpdate {
         In(Duration)
@@ -37,20 +37,20 @@
 
 * new features
   - new modules
-  -- [ ] "utilization" module that tracks cpu, gpu, and memory utilization
-  -- [ ] "temperature" module that tracks cpu and gpu temperature
-  -- [ ] "privacy" module that displays if any process is monitoring camera or microphone
-  --- [ ] webcam, microphone, or screen sharing icon will slowly pulse the color green if their respective device is in use
-  --- [ ] user can specify which devices to watch
-  -- [ ] "watch" or "monitor" module (watches processes and displays in bar when they're running)
-  - [ ] progress bars
-  -- [ ] "sliders" for volume/brightness
-  -- [ ] maybe progress bars that can track tasks
-  - [ ] banners
-  -- [ ] large banners (temporarily replace entire bar text with an important notification)
-  -- [ ] small banners (don't replace entire bar, just display alongside tertiary blocks)
-  -- [ ] notification daemon?
-  - [ ] timers/stopwatches
-  - [ ] new touchscreen features
-  -- [ ] interactive volume, brightness sliders
-  - [ ] reminders?
+  -- ( ) "utilization" module that tracks cpu, gpu, and memory utilization
+  -- ( ) "temperature" module that tracks cpu and gpu temperature
+  -- ( ) "privacy" module that displays if any process is monitoring camera or microphone
+  --- ( ) webcam, microphone, or screen sharing icon will slowly pulse the color green if their respective device is in use
+  --- ( ) user can specify which devices to watch
+  -- ( ) "watch" or "monitor" module (watches processes and displays in bar when they're running)
+  - ( ) progress bars
+  -- ( ) "sliders" for volume/brightness
+  -- ( ) maybe progress bars that can track tasks
+  - ( ) banners
+  -- ( ) large banners (temporarily replace entire bar text with an important notification)
+  -- ( ) small banners (don't replace entire bar, just display alongside tertiary blocks)
+  -- ( ) notification daemon?
+  - ( ) timers/stopwatches
+  - ( ) new touchscreen features
+  -- ( ) interactive volume, brightness sliders
+  - ( ) reminders?
