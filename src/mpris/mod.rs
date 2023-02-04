@@ -59,30 +59,16 @@ impl MprisBlock {
         mutex: Arc<Mutex<Box<Self>>>,
         block_sender: Sender<BlockOutputMsg>,
     ) -> Result<(), MuseStatusError> {
-        let players = loop {
-            if let Ok(player_finder) = mpris_lib::PlayerFinder::new() {
-                if let Ok(players) = player_finder.find_all() {
-                    // ensure that there's at least one player we can use
-                    if !players.is_empty() {
-                        break players;
-                    }
-                }
-            }
-
-            thread::sleep(std::time::Duration::from_secs(5));
-        };
-
-        assert!(players.first().is_some());
-        let player = players
-            .iter()
-            .find(|p| {
-                if let Ok(status) = p.get_playback_status() {
-                    status == mpris::PlaybackStatus::Playing
-                } else {
-                    false
-                }
-            })
-            .unwrap_or_else(|| players.first().unwrap());
+        let mut player = mpris_lib::PlayerFinder::new()
+            .map_err(|e| UpdateError {
+                block_name: "mpris".to_string(),
+                message: format!("couldn't create PlayerFinder: {e}"),
+            })?
+            .find_active()
+            .map_err(|e| UpdateError {
+                block_name: "mpris".to_string(),
+                message: format!("couldn't find active player: {e}"),
+            })?;
 
         {
             let mut block = mutex.lock().unwrap();
