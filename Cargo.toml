@@ -15,6 +15,5 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8" # for parsing/writing config files
 serde_json = "1.0"
 mpris = { git = "https://github.com/Mange/mpris-rs", rev = "95ae5bf5d33a780f57328044a700308fe7d1c5c2" }
-dbus = "0.8"
 xml-rs = "0.8" # for xml escaping
 dirs = "3.0"
