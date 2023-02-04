@@ -70,6 +70,9 @@ impl MprisBlock {
                 message: format!("couldn't find active player: {e}"),
             })?;
 
+        // allow a timeout of 10s
+        player.set_dbus_timeout_ms(10000);
+
         {
             let mut block = mutex.lock().unwrap();
             let metadata = player.get_metadata().map_err(|e| UpdateError {
