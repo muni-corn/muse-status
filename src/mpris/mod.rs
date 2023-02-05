@@ -135,7 +135,9 @@ impl Block for MprisBlock {
         let player_listen_handle = thread::Builder::new()
             .name(String::from("mpris player listener"))
             .spawn(move || loop {
-                let _ = Self::main_iteration(mutex.clone(), block_sender.clone());
+                if let Err(e) = Self::main_iteration(mutex.clone(), block_sender.clone()) {
+                    eprintln!("error in main mpris block loop: {e}");
+                }
 
                 // sleep after every iteration to prevent spamming
                 thread::sleep(std::time::Duration::from_secs(5));
