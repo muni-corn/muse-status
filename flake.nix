@@ -30,7 +30,7 @@
               dbus
               pkg-config
               rustfmt
-              libressl_3_5;
+              libressl_3_6;
           };
           buildInputs = with pkgs; [ dbus pamixer alsa-utils iputils ];
 
