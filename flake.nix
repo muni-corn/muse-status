@@ -57,12 +57,13 @@
         in
         {
           # `nix build`
-          packages = { inherit muse-status; };
-          defaultPackage = muse-status;
+          packages.default = muse-status;
 
           # `nix run`
-          apps.muse-status = muse-status-client-app;
-          apps.muse-status-daemon = muse-status-daemon-app;
+          apps = {
+            muse-status = muse-status-client-app;
+            muse-status-daemon = muse-status-daemon-app;
+          };
 
           # `nix develop`
           devShell =
@@ -81,9 +82,9 @@
       );
     in
     {
-      inherit (allSystems) packages defaultPackage apps devShell;
+      inherit (allSystems) packages apps devShell;
       overlay = final: prev: {
-        muse-status = allSystems.packages.${final.system}.muse-status;
+        muse-status = allSystems.packages.${prev.system}.default;
       };
     };
 }
