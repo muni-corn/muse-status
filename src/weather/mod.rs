@@ -37,7 +37,6 @@ impl Units {
 pub struct WeatherBlock {
     config: WeatherConfig,
     current_report: Option<WttrReport>,
-    location: Option<WeatherLocation>,
 }
 
 impl Default for WeatherBlock {
@@ -52,34 +51,6 @@ impl WeatherBlock {
         Self {
             config,
             current_report: None,
-            location: None,
-        }
-    }
-
-    /// Creates a new weather block, but with a custom location.
-    pub fn new_with_location(config: WeatherConfig, location: WeatherLocation) -> Self {
-        let mut w = Self::new(config);
-        w.current_report = None;
-        w.location = Some(location);
-
-        w
-    }
-
-    fn get_current_location(&self) -> Result<WeatherLocation, MuseStatusError> {
-        let ip = get_external_ip()?;
-
-        let url = format!(
-            "http://api.ipstack.com/{}?access_key={}&format=1",
-            ip, self.config.ipstack_key
-        );
-
-        let res = reqwest::blocking::get(&url)?;
-
-        match serde_json::from_str::<WeatherLocation>(&res.text()?) {
-            Ok(r) => Ok(r),
-            Err(e) => Err(MuseStatusError::from(BasicError {
-                message: format!("couldn't deserialize current location from ipstack: {}", e),
-            })),
         }
     }
 
@@ -153,10 +124,4 @@ impl Block for WeatherBlock {
             self.config.update_interval_minutes.into(),
         )))
     }
-}
-
-/// Returns the external, public IP address of this device. The address is used to find the
-/// device's current location.
-pub fn get_external_ip() -> Result<String, MuseStatusError> {
-    Ok(reqwest::blocking::get("http://ifconfig.me")?.text()?)
 }
