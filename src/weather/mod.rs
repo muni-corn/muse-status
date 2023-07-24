@@ -23,15 +23,6 @@ pub enum Units {
     Metric,
 }
 
-impl Units {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Self::Imperial => "imperial",
-            Self::Metric => "metric",
-        }
-    }
-}
-
 /// WeatherBlock returns information about the weather around the user's current location.
 /// OpenWeatherMap and IPStack are used for weather and location respectively.
 pub struct WeatherBlock {
