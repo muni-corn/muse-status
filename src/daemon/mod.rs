@@ -193,8 +193,8 @@ impl Daemon {
         println!("a new subscriber requested to connect");
 
         // initialize the subscriber by sending all current data to it
-        let mut sub = Subscriber(conn, collection);
-        self.force_send_data(&mut sub)?;
+        let sub = Subscriber(conn, collection);
+        self.force_send_data(&sub)?;
 
         // register the subscriber
         self.subscribers.push(sub);
@@ -282,7 +282,7 @@ impl Daemon {
     }
 
     /// Sends all data requested by the subscriber, usually to initialize it.
-    fn force_send_data(&self, sub: &mut Subscriber) -> Result<(), MuseStatusError> {
+    fn force_send_data(&self, sub: &Subscriber) -> Result<(), MuseStatusError> {
         let all_outputs = self
             .block_outputs
             .values()
@@ -465,7 +465,7 @@ fn is_block_name_in_collection(config: &Config, block_name: &str, collection: &C
 }
 
 fn send_serialized_data(
-    sub: &mut Subscriber,
+    sub: &Subscriber,
     serialized_data: &str,
 ) -> Result<(), MuseStatusError> {
     // add a new line to the end of the data so that clients can parse correctly
