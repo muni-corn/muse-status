@@ -36,8 +36,7 @@ impl Units {
 /// OpenWeatherMap and IPStack are used for weather and location respectively.
 pub struct WeatherBlock {
     config: WeatherConfig,
-
-    current_report: Option<FullWeatherReport>,
+    current_report: Option<WttrReport>,
     location: Option<WeatherLocation>,
 }
 
@@ -52,7 +51,6 @@ impl WeatherBlock {
     pub fn new(config: WeatherConfig) -> Self {
         Self {
             config,
-
             current_report: None,
             location: None,
         }
@@ -85,68 +83,22 @@ impl WeatherBlock {
         }
     }
 
-    fn get_weather_icon(&self, report: &FullWeatherReport) -> char {
-        report
-            .weather
-            .first()
-            .map(|r| {
-                let icon_string = &r.icon;
-                self.config.weather_icons[icon_string]
-            })
-            .unwrap_or(self.config.default_icon)
+    fn get_weather_icon(&self, report: &WttrReport) -> char {
+        *self
+            .config
+            .weather_icons
+            .get(&report.weather_code)
+            .unwrap_or(&self.config.default_icon)
     }
 
     fn update_current_report(&mut self) -> Result<(), UpdateError> {
-        if self.location.is_none() {
-            let location = self.get_current_location().map_err(|e| UpdateError {
-                block_name: self.name().to_owned(),
-                message: format!("couldn't get current location: {}", e),
-            })?;
-            self.location = Some(location);
-        }
-
-        self.current_report = match &self.location {
-            Some(l) => {
-                let req_url = format!(
-                    "http://api.openweathermap.org/data/2.5/weather?lat={}&lon={}&appid={}&units={}",
-                    l.latitude, l.longitude, self.config.openweathermap_key, self.config.units.as_str()
-                );
-
-                let text = match reqwest::blocking::get(&req_url) {
-                    Ok(res) => match res.text() {
-                        Ok(t) => t,
-                        Err(e) => {
-                            return Err(UpdateError {
-                                block_name: self.name().to_string(),
-                                message: format!("couldn't retrieve weather data as text: {}", e),
-                            })
-                        }
-                    },
-                    Err(e) => {
-                        return Err(UpdateError {
-                            block_name: self.name().to_string(),
-                            message: format!("couldn't retrieve weather data: {}", e),
-                        })
-                    }
-                };
-
-                let report: FullWeatherReport = match serde_json::from_str(&text) {
-                    Ok(r) => r,
-                    Err(e) => {
-                        return Err(UpdateError {
-                            block_name: self.name().to_string(),
-                            message: format!(
-                                "couldn't deserialize response for weather report: {}",
-                                e
-                            ),
-                        })
-                    }
-                };
-
-                Some(report)
-            }
-            None => unreachable!(), // because location should be initialized if None at the beginning of this function
-        };
+        self.current_report = reqwest::blocking::get("https://wttr.in/?format=j1")
+            .and_then(|res| res.json::<WttrReport>())
+            .map_err(|e| UpdateError {
+                block_name: self.name().to_string(),
+                message: format!("couldn't retrieve weather data: {}", e),
+            })
+            .map(Option::Some)?;
 
         Ok(())
     }
@@ -180,10 +132,10 @@ impl Block for WeatherBlock {
 
     fn output(&self) -> Option<BlockOutput> {
         self.current_report.as_ref().map(|r| {
-            let temp_string = r.temperature_string();
+            let temp_string = r.temperature_string(self.config.units);
 
             let text = if let Some(desc) = r.description() {
-                BlockText::Pair(temp_string, desc)
+                BlockText::Pair(temp_string, desc.to_string())
             } else {
                 BlockText::Single(temp_string)
             };

@@ -1,59 +1,77 @@
 use serde::Deserialize;
 
+use super::Units;
+
 #[derive(Deserialize)]
-pub struct WeatherLocation {
-    pub latitude: f32,
-    pub longitude: f32,
+pub struct WrappedValue {
+    pub value: String,
 }
 
 #[derive(Deserialize)]
-pub struct SunTimeData {
-    pub sunrise: i64,
-    pub sunset: i64,
+pub struct WttrReport {
+    pub humidity: String,
+    pub pressure: String,
+    pub visibility: String,
+
+    #[serde(rename = "FeelsLikeC")]
+    pub feels_like_c: String,
+
+    #[serde(rename = "FeelsLikeF")]
+    pub feels_like_f: String,
+
+    #[serde(rename = "cloudcover")]
+    pub cloud_cover: String,
+
+    #[serde(rename = "observation_time")]
+    pub observation_time: String,
+
+    #[serde(rename = "precipMM")]
+    pub precip_mm: String,
+
+    #[serde(rename = "temp_C")]
+    pub temp_c: String,
+
+    #[serde(rename = "temp_F")]
+    pub temp_f: String,
+
+    #[serde(rename = "uvIndex")]
+    pub uv_index: String,
+
+    #[serde(rename = "weatherCode")]
+    pub weather_code: String,
+
+    #[serde(rename = "weatherDesc")]
+    pub weather_desc: Vec<WrappedValue>,
+
+    #[serde(rename = "weatherIconUrl")]
+    pub weather_icon_url: Vec<WrappedValue>,
+
+    #[serde(rename = "winddir16Point")]
+    pub wind_dir_16p: String,
+
+    #[serde(rename = "winddirDegree")]
+    pub wind_dir_degree: String,
+
+    #[serde(rename = "windspeedKmph")]
+    pub wind_speed_kmph: String,
+
+    #[serde(rename = "windspeedMiles")]
+    pub windspeed_miles: String,
 }
 
-#[derive(Deserialize)]
-pub struct WeatherDetails {
-    pub description: String,
-    pub icon: String,
-}
-
-#[derive(Deserialize)]
-pub struct WeatherWind {
-    pub speed: f32,
-    pub deg: f32,
-}
-
-#[derive(Deserialize)]
-pub struct WeatherMain {
-    pub temp: f32,
-}
-
-#[derive(Deserialize)]
-pub struct FullWeatherReport {
-    pub sys: SunTimeData,
-    pub weather: Vec<WeatherDetails>,
-    pub main: WeatherMain,
-    pub wind: WeatherWind,
-}
-
-impl FullWeatherReport {
+impl WttrReport {
     /// Returns a number with a little circle-thing next to it.
-    pub fn temperature_string(&self) -> String {
-        format!("{}°", self.main.temp.round() as i32)
+    pub fn temperature_string(&self, units: Units) -> String {
+        let value = match units {
+            Units::Imperial => self.temp_f.as_str(),
+            Units::Metric => self.temp_c.as_str(),
+        };
+
+        format!("{}°", value)
     }
 
-    /// Returns a String-ified weather description, in Sentence case.
-    pub fn description(&self) -> Option<String> {
-        self.weather.first().map(|w| {
-            // capitalize the first letter in the description
-            let mut chars = w.description.chars();
-            if let Some(first_char) = chars.next() {
-                first_char.to_ascii_uppercase().to_string() + chars.as_str()
-            } else {
-                // if there wasn't a first char, there must've been no description
-                String::from("No description")
-            }
-        })
+    /// Returns the weather description in Sentence case.
+    pub fn description(&self) -> Option<&str> {
+        self.weather_desc.first().map(|w| w.value.as_str())
     }
 }
