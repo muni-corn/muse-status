@@ -121,12 +121,6 @@ impl Default for BatteryConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct WeatherConfig {
-    /// API key for OpenWeatherMap, which, ya know, gets weather information.
-    pub openweathermap_key: String,
-
-    /// API key for IPStack, which returns a geolocation from a user's public IP.
-    pub ipstack_key: String,
-
     /// Weather icons.
     pub weather_icons: HashMap<String, char>,
 
@@ -167,10 +161,6 @@ impl Default for WeatherConfig {
         };
 
         Self {
-            // users need to supply their own API keys
-            openweathermap_key: String::new(),
-            ipstack_key: String::new(),
-
             weather_icons,
             default_icon: '\u{F0590}',
             update_interval_minutes: 20,
