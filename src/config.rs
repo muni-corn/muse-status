@@ -124,6 +124,9 @@ pub struct WeatherConfig<'a> {
     /// Weather icons.
     pub weather_icons: HashMap<&'a str, char>,
 
+    /// Night time weather icons.
+    pub night_weather_icons: HashMap<&'a str, char>,
+
     /// The default icon to use if a weather icon isn't available.
     pub default_icon: char,
 
@@ -137,9 +140,11 @@ pub struct WeatherConfig<'a> {
 impl Default for WeatherConfig<'_> {
     fn default() -> Self {
         let weather_icons = HashMap::from(DEFAULT_WEATHER_ICONS);
+        let night_weather_icons = HashMap::from(DEFAULT_NIGHT_WEATHER_ICONS);
 
         Self {
             weather_icons,
+            night_weather_icons,
             default_icon: '\u{F1BF9}',
             update_interval_minutes: 20,
 
@@ -260,4 +265,24 @@ const DEFAULT_WEATHER_ICONS: [(&str, char); 48] = [
     ("392", '\u{F0593}'),
     // Moderate or heavy snow in area with thunder
     ("395", '\u{F0593}'),
+];
+
+/// Default weather icons for nighttime weather using the Material Design Icons font. Codes are
+/// taken from here, according to wttr.in:
+/// https://www.worldweatheronline.com/weather-api/api/docs/weather-icons.aspx
+const DEFAULT_NIGHT_WEATHER_ICONS: [(&str, char); 7] = [
+    // Clear/Sunny
+    ("113", '\u{F0594}'),
+    // Partly Cloudy
+    ("116", '\u{F0F31}'),
+    // Patchy light snow
+    ("323", '\u{F0598}'),
+    // Patchy moderate snow
+    ("329", '\u{F0F36}'),
+    // Patchy heavy snow
+    ("335", '\u{F0F36}'),
+    // Patchy light rain in area with thunder
+    ("386", '\u{F0597}'),
+    // Patchy light snow in area with thunder
+    ("392", '\u{F0597}'),
 ];
