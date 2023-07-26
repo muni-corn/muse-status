@@ -11,8 +11,6 @@ pub struct WrappedValue {
 #[derive(Deserialize)]
 pub struct CurrentCondition {
     pub humidity: String,
-    pub pressure: String,
-    pub visibility: String,
 
     #[serde(rename = "FeelsLikeC")]
     pub feels_like_c: String,
@@ -20,14 +18,8 @@ pub struct CurrentCondition {
     #[serde(rename = "FeelsLikeF")]
     pub feels_like_f: String,
 
-    #[serde(rename = "cloudcover")]
-    pub cloud_cover: String,
-
     #[serde(rename = "observation_time")]
     pub observation_time: String,
-
-    #[serde(rename = "precipMM")]
-    pub precip_mm: String,
 
     #[serde(rename = "temp_C")]
     pub temp_c: String,
@@ -35,35 +27,18 @@ pub struct CurrentCondition {
     #[serde(rename = "temp_F")]
     pub temp_f: String,
 
-    #[serde(rename = "uvIndex")]
-    pub uv_index: String,
-
     #[serde(rename = "weatherCode")]
     pub weather_code: String,
 
     #[serde(rename = "weatherDesc")]
     pub weather_desc: Vec<WrappedValue>,
-
-    #[serde(rename = "weatherIconUrl")]
-    pub weather_icon_url: Vec<WrappedValue>,
-
-    #[serde(rename = "winddir16Point")]
-    pub wind_dir_16p: String,
-
-    #[serde(rename = "winddirDegree")]
-    pub wind_dir_degree: String,
-
-    #[serde(rename = "windspeedKmph")]
-    pub wind_speed_kmph: String,
-
-    #[serde(rename = "windspeedMiles")]
-    pub windspeed_miles: String,
 }
 
 #[derive(Deserialize)]
 pub struct Weather {
     pub astronomy: Vec<Astronomy>,
 }
+
 #[derive(Deserialize)]
 pub struct Astronomy {
     pub sunrise: NaiveTime,
