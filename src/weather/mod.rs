@@ -46,10 +46,9 @@ impl WeatherBlock {
     }
 
     fn get_weather_icon(&self, report: &WttrReport) -> char {
-        *self
-            .config
-            .weather_icons
-            .get(&report.weather_code)
+        *report
+            .weather_code()
+            .and_then(|code| self.config.weather_icons.get(code))
             .unwrap_or(&self.config.default_icon)
     }
 
@@ -93,20 +92,24 @@ impl Block for WeatherBlock {
     }
 
     fn output(&self) -> Option<BlockOutput> {
-        self.current_report.as_ref().map(|r| {
+        self.current_report.as_ref().and_then(|r| {
             let temp_string = r.temperature_string(self.config.units);
 
-            let text = if let Some(desc) = r.description() {
-                BlockText::Pair(temp_string, desc.to_string())
+            let text = if let (Some(temp), Some(desc)) = (&temp_string, r.description()) {
+                BlockText::Pair(temp.to_string(), desc.to_string())
+            } else if let Some(temp) = &temp_string {
+                BlockText::Single(temp.to_string())
+            } else if let Some(desc) = r.description() {
+                BlockText::Single(desc.to_string())
             } else {
-                BlockText::Single(temp_string)
+                return None;
             };
-            BlockOutput::new(
+            Some(BlockOutput::new(
                 self.name(),
                 Some(self.get_weather_icon(r)),
                 text,
                 Attention::Normal,
-            )
+            ))
         })
     }
 

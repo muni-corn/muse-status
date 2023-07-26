@@ -8,7 +8,7 @@ pub struct WrappedValue {
 }
 
 #[derive(Deserialize)]
-pub struct WttrReport {
+pub struct CurrentCondition {
     pub humidity: String,
     pub pressure: String,
     pub visibility: String,
@@ -59,19 +59,34 @@ pub struct WttrReport {
     pub windspeed_miles: String,
 }
 
+#[derive(Deserialize)]
+pub struct WttrReport {
+    pub current_condition: Vec<CurrentCondition>,
+}
+
 impl WttrReport {
     /// Returns a number with a little circle-thing next to it.
-    pub fn temperature_string(&self, units: Units) -> String {
-        let value = match units {
-            Units::Imperial => self.temp_f.as_str(),
-            Units::Metric => self.temp_c.as_str(),
-        };
+    pub fn temperature_string(&self, units: Units) -> Option<String> {
+        self.current_condition.first().map(|c| {
+            let value = match units {
+                Units::Imperial => c.temp_f.as_str(),
+                Units::Metric => c.temp_c.as_str(),
+            };
 
-        format!("{}°", value)
+            format!("{}°", value)
+        })
     }
 
     /// Returns the weather description in Sentence case.
     pub fn description(&self) -> Option<&str> {
-        self.weather_desc.first().map(|w| w.value.as_str())
+        self.current_condition
+            .first()
+            .and_then(|c| c.weather_desc.first().map(|w| w.value.as_str()))
+    }
+
+    pub fn weather_code(&self) -> Option<&str> {
+        self.current_condition
+            .first()
+            .map(|c| c.weather_code.as_str())
     }
 }
