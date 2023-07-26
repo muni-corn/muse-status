@@ -5,7 +5,7 @@ use std::{collections::HashMap, fs::File, path::Path, path::PathBuf};
 /// Configuration for all of muse-status.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(default)]
-pub struct Config<'a> {
+pub struct Config {
     /// The TCP address to run and listen on.
     pub daemon_addr: String,
 
@@ -32,10 +32,10 @@ pub struct Config<'a> {
     pub battery_config: BatteryConfig,
 
     /// Weather config to use for weather blocks.
-    pub weather_config: WeatherConfig<'a>,
+    pub weather_config: WeatherConfig,
 }
 
-impl Default for Config<'_> {
+impl Default for Config {
     fn default() -> Self {
         Self {
             daemon_addr: "localhost:2899".to_string(),
@@ -62,9 +62,9 @@ impl Default for Config<'_> {
     }
 }
 
-impl Config<'_> {
+impl Config {
     /// Parses the configuration file at the path.
-    pub fn from_file<'a, P: AsRef<Path>>(p: P) -> Result<Config<'a>, MuseStatusError> {
+    pub fn from_file<P: AsRef<Path>>(p: P) -> Result<Config, MuseStatusError> {
         let path = p.as_ref();
         if !path.exists() {
             // if the file path doesn't exist, write the default config to it, then return the
@@ -120,12 +120,12 @@ impl Default for BatteryConfig {
 /// Configuration for a weather information block.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
-pub struct WeatherConfig<'a> {
+pub struct WeatherConfig {
     /// Weather icons.
-    pub weather_icons: HashMap<&'a str, char>,
+    pub weather_icons: HashMap<String, char>,
 
     /// Night time weather icons.
-    pub night_weather_icons: HashMap<&'a str, char>,
+    pub night_weather_icons: HashMap<String, char>,
 
     /// The default icon to use if a weather icon isn't available.
     pub default_icon: char,
@@ -137,10 +137,18 @@ pub struct WeatherConfig<'a> {
     pub units: Units,
 }
 
-impl Default for WeatherConfig<'_> {
+impl Default for WeatherConfig {
     fn default() -> Self {
-        let weather_icons = HashMap::from(DEFAULT_WEATHER_ICONS);
-        let night_weather_icons = HashMap::from(DEFAULT_NIGHT_WEATHER_ICONS);
+        let weather_icons = HashMap::from_iter(
+            DEFAULT_WEATHER_ICONS
+                .iter()
+                .map(|(k, v)| (k.to_string(), *v)),
+        );
+        let night_weather_icons = HashMap::from_iter(
+            DEFAULT_NIGHT_WEATHER_ICONS
+                .iter()
+                .map(|(k, v)| (k.to_string(), *v)),
+        );
 
         Self {
             weather_icons,
