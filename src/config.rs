@@ -5,7 +5,7 @@ use std::{collections::HashMap, fs::File, path::Path, path::PathBuf};
 /// Configuration for all of muse-status.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(default)]
-pub struct Config {
+pub struct Config<'a> {
     /// The TCP address to run and listen on.
     pub daemon_addr: String,
 
@@ -32,10 +32,10 @@ pub struct Config {
     pub battery_config: BatteryConfig,
 
     /// Weather config to use for weather blocks.
-    pub weather_config: WeatherConfig,
+    pub weather_config: WeatherConfig<'a>,
 }
 
-impl Default for Config {
+impl Default for Config<'_> {
     fn default() -> Self {
         Self {
             daemon_addr: "localhost:2899".to_string(),
@@ -62,9 +62,9 @@ impl Default for Config {
     }
 }
 
-impl Config {
+impl Config<'_> {
     /// Parses the configuration file at the path.
-    pub fn from_file<P: AsRef<Path>>(p: P) -> Result<Config, MuseStatusError> {
+    pub fn from_file<'a, P: AsRef<Path>>(p: P) -> Result<Config<'a>, MuseStatusError> {
         let path = p.as_ref();
         if !path.exists() {
             // if the file path doesn't exist, write the default config to it, then return the
@@ -120,9 +120,9 @@ impl Default for BatteryConfig {
 /// Configuration for a weather information block.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
-pub struct WeatherConfig {
+pub struct WeatherConfig<'a> {
     /// Weather icons.
-    pub weather_icons: HashMap<String, char>,
+    pub weather_icons: HashMap<&'a str, char>,
 
     /// The default icon to use if a weather icon isn't available.
     pub default_icon: char,
@@ -134,35 +134,13 @@ pub struct WeatherConfig {
     pub units: Units,
 }
 
-impl Default for WeatherConfig {
+impl Default for WeatherConfig<'_> {
     fn default() -> Self {
-        let weather_icons = {
-            let mut hm = HashMap::<String, char>::new();
-            hm.insert(String::from("01d"), '\u{F0599}');
-            hm.insert(String::from("01n"), '\u{F0594}');
-            hm.insert(String::from("02d"), '\u{F0595}');
-            hm.insert(String::from("02n"), '\u{F0F31}');
-            hm.insert(String::from("03d"), '\u{F0590}');
-            hm.insert(String::from("03n"), '\u{F0590}');
-            hm.insert(String::from("04d"), '\u{F0590}');
-            hm.insert(String::from("04n"), '\u{F0590}');
-            hm.insert(String::from("09d"), '\u{F0597}');
-            hm.insert(String::from("09n"), '\u{F0597}');
-            hm.insert(String::from("10d"), '\u{F0596}');
-            hm.insert(String::from("10n"), '\u{F0596}');
-            hm.insert(String::from("11d"), '\u{F0593}');
-            hm.insert(String::from("11n"), '\u{F0593}');
-            hm.insert(String::from("13d"), '\u{F0598}');
-            hm.insert(String::from("13n"), '\u{F0598}');
-            hm.insert(String::from("50d"), '\u{F0591}');
-            hm.insert(String::from("50n"), '\u{F0591}');
-
-            hm
-        };
+        let weather_icons = HashMap::from(DEFAULT_WEATHER_ICONS);
 
         Self {
             weather_icons,
-            default_icon: '\u{F0590}',
+            default_icon: '\u{F1BF9}',
             update_interval_minutes: 20,
 
             // although i'm in the US, the rest of the world uses metric, so let's appeal to the
@@ -182,3 +160,104 @@ pub fn default_config_path() -> Result<PathBuf, MuseStatusError> {
         }))
     }
 }
+
+/// Default weather icons using the Material Design Icons font. Codes are taken from here,
+/// according to wttr.in: https://www.worldweatheronline.com/weather-api/api/docs/weather-icons.aspx
+const DEFAULT_WEATHER_ICONS: [(&str, char); 48] = [
+    // Clear/Sunny
+    ("113", '\u{F0599}'),
+    // Partly Cloudy
+    ("116", '\u{F0595}'),
+    // Cloudy
+    ("119", '\u{F0163}'),
+    // Overcast
+    ("122", '\u{F0163}'),
+    // Mist
+    ("143", '\u{F0F30}'),
+    // Patchy rain nearby
+    ("176", '\u{F0F33}'),
+    // Patchy snow nearby
+    ("179", '\u{F0F34}'),
+    // Patchy sleet nearby
+    ("182", '\u{F0F35}'),
+    // Patchy freezing drizzle nearby
+    ("185", '\u{F0F33}'),
+    // Thundery outbreaks in nearby
+    ("200", '\u{F0593}'),
+    // Blowing snow
+    ("227", '\u{F059E}'),
+    // Blizzard
+    ("230", '\u{F0F29}'),
+    // Fog
+    ("248", '\u{F0591}'),
+    // Freezing fog
+    ("260", '\u{F0591}'),
+    // Patchy light drizzle
+    ("263", '\u{F0F33}'),
+    // Light drizzle
+    ("266", '\u{F0597}'),
+    // Freezing drizzle
+    ("281", '\u{F0597}'),
+    // Heavy freezing drizzle
+    ("284", '\u{F0596}'),
+    // Patchy light rain
+    ("293", '\u{F0F33}'),
+    // Light rain
+    ("296", '\u{F0597}'),
+    // Moderate rain at times
+    ("299", '\u{F0596}'),
+    // Moderate rain
+    ("302", '\u{F0596}'),
+    // Heavy rain at times
+    ("305", '\u{F0596}'),
+    // Heavy rain
+    ("308", '\u{F0596}'),
+    // Light freezing rain
+    ("311", '\u{F0597}'),
+    // Moderate or Heavy freezing rain
+    ("314", '\u{F0596}'),
+    // Light sleet
+    ("317", '\u{F067F}'),
+    // Moderate or heavy sleet
+    ("320", '\u{F067F}'),
+    // Patchy light snow
+    ("323", '\u{F0F34}'),
+    // Light snow
+    ("326", '\u{F0598}'),
+    // Patchy moderate snow
+    ("329", '\u{F0598}'),
+    // Moderate snow
+    ("332", '\u{F0598}'),
+    // Patchy heavy snow
+    ("335", '\u{F0F36}'),
+    // Heavy snow
+    ("338", '\u{F0F36}'),
+    // Ice pellets
+    ("350", '\u{F0592}'),
+    // Light rain shower
+    ("353", '\u{F0597}'),
+    // Moderate or heavy rain shower
+    ("356", '\u{F0596}'),
+    // Torrential rain shower
+    ("359", '\u{F0596}'),
+    // Light sleet showers
+    ("362", '\u{F067F}'),
+    // Moderate or heavy sleet showers
+    ("365", '\u{F067F}'),
+    // Light snow showers
+    ("368", '\u{F0598}'),
+    // Moderate or heavy snow showers
+    ("371", '\u{F0F36}'),
+    // Light showers of ice pellets
+    ("374", '\u{F0592}'),
+    // Moderate or heavy showers of ice pellets
+    ("377", '\u{F0592}'),
+    // Patchy light rain in area with thunder
+    ("386", '\u{F0F32}'),
+    // Moderate or heavy rain in area with thunder
+    ("389", '\u{F067E}'),
+    // Patchy light snow in area with thunder
+    ("392", '\u{F0593}'),
+    // Moderate or heavy snow in area with thunder
+    ("395", '\u{F0593}'),
+];
