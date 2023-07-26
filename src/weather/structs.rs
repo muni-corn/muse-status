@@ -39,9 +39,20 @@ pub struct Weather {
     pub astronomy: Vec<Astronomy>,
 }
 
+fn deserialize_time<'de, D>(deserializer: D) -> Result<NaiveTime, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    NaiveTime::parse_from_str(&s, "%I:%M %p").map_err(serde::de::Error::custom)
+}
+
 #[derive(Deserialize)]
 pub struct Astronomy {
+    #[serde(deserialize_with = "deserialize_time")]
     pub sunrise: NaiveTime,
+
+    #[serde(deserialize_with = "deserialize_time")]
     pub sunset: NaiveTime,
 }
 
