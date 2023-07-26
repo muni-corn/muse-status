@@ -1,3 +1,4 @@
+use chrono::NaiveTime;
 use serde::Deserialize;
 
 use super::Units;
@@ -60,8 +61,19 @@ pub struct CurrentCondition {
 }
 
 #[derive(Deserialize)]
+pub struct Weather {
+    pub astronomy: Vec<Astronomy>,
+}
+#[derive(Deserialize)]
+pub struct Astronomy {
+    pub sunrise: NaiveTime,
+    pub sunset: NaiveTime,
+}
+
+#[derive(Deserialize)]
 pub struct WttrReport {
     pub current_condition: Vec<CurrentCondition>,
+    pub weather: Vec<Weather>,
 }
 
 impl WttrReport {
