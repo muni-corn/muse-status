@@ -48,7 +48,21 @@ impl WeatherBlock {
     fn get_weather_icon(&self, report: &WttrReport) -> char {
         *report
             .weather_code()
-            .and_then(|code| self.config.weather_icons.get(code))
+            .and_then(|code| {
+                report
+                    .weather
+                    .first()
+                    .and_then(|w| w.astronomy.first())
+                    .and_then(|astronomy| {
+                        let now = chrono::Local::now().time();
+                        if now >= astronomy.sunset || now <= astronomy.sunrise {
+                            self.config.night_weather_icons.get(code)
+                        } else {
+                            None
+                        }
+                    })
+                    .or_else(|| self.config.weather_icons.get(code))
+            })
             .unwrap_or(&self.config.default_icon)
     }
 
