@@ -1,14 +1,23 @@
-use crate::errors::*;
-use crate::format::blocks::output::{BlockOutput, BlockText};
-use crate::format::blocks::{Block, BlockOutputMsg, NextUpdate};
-use crate::format::Attention;
-use mpris as mpris_lib;
-use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::thread::JoinHandle;
+use std::{
+    sync::{mpsc::Sender, Arc, Mutex},
+    thread::{self, JoinHandle},
+};
 
-/// A block that displays information about any media currently playing on the device.
+use mpris as mpris_lib;
+
+use crate::{
+    errors::*,
+    format::{
+        blocks::{
+            output::{BlockOutput, BlockText},
+            Block, BlockOutputMsg, NextUpdate,
+        },
+        Attention,
+    },
+};
+
+/// A block that displays information about any media currently playing on the
+/// device.
 pub struct MprisBlock {
     playing_icon: char,
     paused_icon: char,
@@ -127,8 +136,8 @@ impl Block for MprisBlock {
         self: Box<Self>,
         block_sender: Sender<BlockOutputMsg>,
     ) -> (Vec<JoinHandle<()>>, Sender<()>) {
-        // This might seem dumb, but MprisBlock updates are dependent on updates from the mpris
-        // client, so it will not listen to any "notify" requests
+        // This might seem dumb, but MprisBlock updates are dependent on updates from
+        // the mpris client, so it will not listen to any "notify" requests
         let (notify_tx, _) = std::sync::mpsc::channel::<()>();
 
         let mutex = Arc::new(Mutex::new(self));

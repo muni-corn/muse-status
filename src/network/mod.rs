@@ -1,12 +1,3 @@
-use crate::{
-    errors::*,
-    format::{
-        blocks::{output::BlockText, Block, BlockOutput, NextUpdate},
-        Attention,
-    },
-};
-use chrono::Duration;
-use nl80211::Socket;
 use std::{
     fmt::Display,
     fs,
@@ -14,7 +5,17 @@ use std::{
     process::{Command, Stdio},
 };
 
+use chrono::Duration;
+use nl80211::Socket;
+
 use self::icons::NetworkIcons;
+use crate::{
+    errors::*,
+    format::{
+        blocks::{output::BlockText, Block, BlockOutput, NextUpdate},
+        Attention,
+    },
+};
 
 /// Module for all sorts of network icons.
 pub mod icons;
@@ -107,8 +108,9 @@ impl NetworkBlock {
         }
     }
 
-    /// Returns true if the file content at `/sys/class/{iface_name}/{file_name}` matches
-    /// `up_value`. Special thanks to i3status-rust's source code for guidance here.
+    /// Returns true if the file content at
+    /// `/sys/class/{iface_name}/{file_name}` matches `up_value`. Special
+    /// thanks to i3status-rust's source code for guidance here.
     fn is_up_according_to_file(
         &self,
         file_name: &str,
@@ -151,7 +153,8 @@ impl NetworkBlock {
         {
             // get interface
             let iface = get_wireless_interface(&self.iface_name).map_err(|e| {
-                // set status to unknown if there's an error
+                // set status to unknown if
+                // there's an error
                 self.status = NetworkStatus::Unknown;
 
                 UpdateError {

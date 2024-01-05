@@ -1,10 +1,11 @@
-use super::Mode;
-use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
-/// Color doesn't represent colors as numbers; instead, it is an enum for types of
-/// colors encountered in muse-status.
+use serde::{Deserialize, Serialize};
+
+use super::Mode;
+
+/// Color doesn't represent colors as numbers; instead, it is an enum for types
+/// of colors encountered in muse-status.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum Color {
     /// The primary color.
@@ -122,8 +123,8 @@ impl RGBA {
     }
 }
 
-/// Mixes two colors together. Interpolation determines how much of either `first` (0.0) or
-/// `second` (1.0) is in the result.
+/// Mixes two colors together. Interpolation determines how much of either
+/// `first` (0.0) or `second` (1.0) is in the result.
 pub fn interpolate_colors(first: &RGBA, second: &RGBA, interpolation: f32) -> RGBA {
     let a = (first.a as f32) * (1.0 - interpolation) + (second.a as f32) * interpolation;
     let r = (first.r as f32) * (1.0 - interpolation) + (second.r as f32) * interpolation;
@@ -138,7 +139,8 @@ pub fn interpolate_colors(first: &RGBA, second: &RGBA, interpolation: f32) -> RG
     }
 }
 
-/// Returned when muse-status has an issue parsing an RGBA struct from a hex string, e.g. rrggbbaa
+/// Returned when muse-status has an issue parsing an RGBA struct from a hex
+/// string, e.g. rrggbbaa
 #[derive(Debug)]
 pub enum RGBAParseError {
     /// The String has an invalid length to be a color.

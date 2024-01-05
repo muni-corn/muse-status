@@ -1,8 +1,15 @@
-use crate::errors::*;
-use crate::format::blocks::output::{BlockOutput, BlockText};
-use crate::format::blocks::{Block, NextUpdate};
-use crate::format::Attention;
 use std::process::Command;
+
+use crate::{
+    errors::*,
+    format::{
+        blocks::{
+            output::{BlockOutput, BlockText},
+            Block, NextUpdate,
+        },
+        Attention,
+    },
+};
 
 /// Enums are great
 #[derive(Debug, Eq, PartialEq)]
@@ -20,7 +27,8 @@ impl Default for Volume {
     }
 }
 
-/// VolumeBlock provides information for the system's audio volume. Requires `amixer`.
+/// VolumeBlock provides information for the system's audio volume. Requires
+/// `amixer`.
 #[derive(Default)]
 pub struct VolumeBlock {
     volume_sink: Option<String>,
@@ -28,6 +36,8 @@ pub struct VolumeBlock {
 }
 
 impl VolumeBlock {
+    const MAX_WAIT_SECONDS: u64 = 30;
+
     /// Returns a new VolumeBlock which uses the specified sink.
     pub fn new(volume_sink: &str) -> Self {
         Self {
@@ -35,8 +45,6 @@ impl VolumeBlock {
             ..Default::default()
         }
     }
-
-    const MAX_WAIT_SECONDS: u64 = 30;
 
     /// Gets the system volume from the `pamixer` command
     fn volume_from_pamixer(&self) -> Result<Volume, UpdateError> {
@@ -152,8 +160,8 @@ impl VolumeBlock {
                     if line_end.contains("off") {
                         Ok(Volume::Off)
                     } else {
-                        // filters out any non-digit characters past the first opening bracket to parse the
-                        // volume amount
+                        // filters out any non-digit characters past the first opening bracket to
+                        // parse the volume amount
                         let raw_percent = line_end
                             .chars()
                             .filter(|c| c.is_ascii_digit())

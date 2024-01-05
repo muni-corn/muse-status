@@ -1,5 +1,4 @@
-use muse_status::client;
-use muse_status::errors::MuseStatusError;
+use muse_status::{client, errors::MuseStatusError};
 
 fn main() -> Result<(), MuseStatusError> {
     // now isn't this simple :)

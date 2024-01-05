@@ -1,3 +1,5 @@
+use chrono::{prelude::*, DateTime, Duration, Local};
+
 use crate::{
     errors::*,
     format::{
@@ -5,7 +7,6 @@ use crate::{
         Attention,
     },
 };
-use chrono::{prelude::*, DateTime, Duration, Local};
 
 /// The format with which to format time strings.
 pub const TIME_FORMAT: &str = "%-I:%M %P";
@@ -109,8 +110,8 @@ fn get_next_minute() -> DateTime<Local> {
     }
 }
 
-/// Returns a time that is either at the next minute of the hour or in five seconds, whichever
-/// comes first.
+/// Returns a time that is either at the next minute of the hour or in five
+/// seconds, whichever comes first.
 fn next_minute_or_five_seconds() -> DateTime<Local> {
     let now = Local::now();
     let next_minute = get_next_minute();

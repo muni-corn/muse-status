@@ -1,3 +1,16 @@
+use std::{
+    collections::HashMap,
+    io::{BufRead, Write},
+    net::{TcpListener, TcpStream},
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        Arc, Mutex,
+    },
+    thread::{self, JoinHandle},
+};
+
+use serde::{Deserialize, Serialize};
+
 use crate::{
     client::ClientMsg,
     config::Config,
@@ -7,25 +20,12 @@ use crate::{
         blocks::{output::BlockOutput, Block, BlockOutputMsg},
     },
 };
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::{
-    mpsc::{self, Receiver, Sender},
-    Arc, Mutex,
-};
-use std::thread;
-use std::thread::JoinHandle;
-use std::{
-    io::BufRead,
-    io::Write,
-    net::{TcpListener, TcpStream},
-};
 
 type BlockVec = Vec<Box<dyn Block>>;
 type BlockOutputs = HashMap<String, BlockOutput>;
 
-/// A daemon for muse-status. The daemon handles the logic of blocks as a server. Any connected
-/// clients are sent the formatted status output.
+/// A daemon for muse-status. The daemon handles the logic of blocks as a
+/// server. Any connected clients are sent the formatted status output.
 pub struct Daemon {
     config: Config,
     subscribers: Vec<Subscriber>,
@@ -46,9 +46,9 @@ impl Daemon {
         }
     }
 
-    /// Starts the Daemon with the given blocks by running many asynchronous threads. If starting
-    /// is successful, this function will return a Vec of JoinHandles, which are to be used by
-    /// the calling function.
+    /// Starts the Daemon with the given blocks by running many asynchronous
+    /// threads. If starting is successful, this function will return a Vec
+    /// of JoinHandles, which are to be used by the calling function.
     pub fn start(mut self, blocks: BlockVec) -> Result<Vec<JoinHandle<()>>, MuseStatusError> {
         #[cfg(debug_assertions)]
         println!("the daemon has been started");
@@ -130,8 +130,9 @@ impl Daemon {
         (handles, senders)
     }
 
-    /// Should be run within a separate thread. `self` should NOT be a parameter, as a mutex would
-    /// be locked for the entirety of this never-ending function.
+    /// Should be run within a separate thread. `self` should NOT be a
+    /// parameter, as a mutex would be locked for the entirety of this
+    /// never-ending function.
     fn accept_connections(daemon_arc: DaemonMutexArc, listener: &TcpListener) {
         #[cfg(debug_assertions)]
         println!("listening for connections");
@@ -151,8 +152,9 @@ impl Daemon {
         }
     }
 
-    /// Should be run within a separate thread. `self` should NOT be a parameter, as a mutex would
-    /// be locked for the entirety of this never-ending function.
+    /// Should be run within a separate thread. `self` should NOT be a
+    /// parameter, as a mutex would be locked for the entirety of this
+    /// never-ending function.
     fn listen_to_blocks(daemon_arc: DaemonMutexArc, block_rx: Receiver<BlockOutputMsg>) {
         #[cfg(debug_assertions)]
         println!("listening for block updates");
@@ -178,8 +180,9 @@ impl Daemon {
         }
     }
 
-    /// Should be run within a separate thread. `self` should NOT be a parameter, as a mutex would
-    /// be locked for the entirety of this never-ending function.
+    /// Should be run within a separate thread. `self` should NOT be a
+    /// parameter, as a mutex would be locked for the entirety of this
+    /// never-ending function.
     fn listen_for_banners(_daemon_arc: DaemonMutexArc, _banner_rx: Receiver<format::Banner>) {
         todo!()
     }
@@ -308,8 +311,8 @@ impl Daemon {
     }
 }
 
-/// A struct containing a TcpStream to send data to. The collection defines what data the
-/// subscriber receives.
+/// A struct containing a TcpStream to send data to. The collection defines what
+/// data the subscriber receives.
 struct Subscriber(TcpStream, Collection);
 
 impl Subscriber {
@@ -334,7 +337,8 @@ impl UpdateRequestSender {
     }
 }
 
-/// An enum for specifying a section of blocks. Used for subscriptions and other commands.
+/// An enum for specifying a section of blocks. Used for subscriptions and other
+/// commands.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Collection {
     /// Primary-level blocks.
@@ -401,7 +405,8 @@ impl DataPayload {
         }
     }
 
-    /// Creates a Ranked DataPayload out of the outputs provided, but only with primary blocks.
+    /// Creates a Ranked DataPayload out of the outputs provided, but only with
+    /// primary blocks.
     pub fn only_primary(config: &Config, outputs: &BlockOutputs) -> Self {
         let v = Self::make_vec(&config.primary_order, outputs);
 
@@ -412,7 +417,8 @@ impl DataPayload {
         }
     }
 
-    /// Creates a Ranked DataPayload out of the outputs provided, but only with secondary blocks.
+    /// Creates a Ranked DataPayload out of the outputs provided, but only with
+    /// secondary blocks.
     pub fn only_secondary(config: &Config, outputs: &BlockOutputs) -> Self {
         let v = Self::make_vec(&config.secondary_order, outputs);
 
@@ -423,7 +429,8 @@ impl DataPayload {
         }
     }
 
-    /// Creates a Ranked DataPayload out of the outputs provided, but only with tertiary blocks.
+    /// Creates a Ranked DataPayload out of the outputs provided, but only with
+    /// tertiary blocks.
     pub fn only_tertiary(config: &Config, outputs: &BlockOutputs) -> Self {
         let v = Self::make_vec(&config.tertiary_order, outputs);
 
@@ -464,10 +471,7 @@ fn is_block_name_in_collection(config: &Config, block_name: &str, collection: &C
     }
 }
 
-fn send_serialized_data(
-    sub: &Subscriber,
-    serialized_data: &str,
-) -> Result<(), MuseStatusError> {
+fn send_serialized_data(sub: &Subscriber, serialized_data: &str) -> Result<(), MuseStatusError> {
     // add a new line to the end of the data so that clients can parse correctly
     let out = format!("{}\n", serialized_data);
     sub.stream()

@@ -1,9 +1,6 @@
 /// A module for block outputs.
 pub mod output;
 
-use crate::{errors::UpdateError, format};
-use chrono::{DateTime, Duration, Local};
-use serde::{Deserialize, Serialize};
 use std::{
     sync::{
         mpsc::{self, Sender},
@@ -13,7 +10,11 @@ use std::{
     time,
 };
 
+use chrono::{DateTime, Duration, Local};
 pub use output::BlockOutput;
+use serde::{Deserialize, Serialize};
+
+use crate::{errors::UpdateError, format};
 
 /// Represents when or in how much time the next update of a block should occur.
 pub enum NextUpdate {
@@ -30,13 +31,15 @@ pub struct BlockOutputMsg {
     /// The name of the block.
     name: String,
 
-    /// The output of the block. If None, the block is (temporarily) removed from the status bar
+    /// The output of the block. If None, the block is (temporarily) removed
+    /// from the status bar
     data: Option<BlockOutput>,
 }
 
 impl BlockOutputMsg {
-    /// Creates a new `BlockOutputMsg` with the name and optional `BlockOutput`. If `data` is
-    /// `None`, then the block will be omitted from the status bar until it is `Some` again.
+    /// Creates a new `BlockOutputMsg` with the name and optional `BlockOutput`.
+    /// If `data` is `None`, then the block will be omitted from the status
+    /// bar until it is `Some` again.
     pub fn new(name: &str, data: Option<BlockOutput>) -> Self {
         Self {
             name: name.to_string(),
@@ -57,13 +60,15 @@ impl BlockOutputMsg {
 
 /// Block is a piece of data in the status bar.
 pub trait Block: Send + Sync {
-    /// Runs the block asynchronously. The tuple returns (1) a `Vec` of `JoinHandle`s to any threads
-    /// started asynchronously and (2) a `Sender` that will send notification query to force an
+    /// Runs the block asynchronously. The tuple returns (1) a `Vec` of
+    /// `JoinHandle`s to any threads started asynchronously and (2) a
+    /// `Sender` that will send notification query to force an
     /// update on blocks (via `muse-status notify <block-name>`).
     ///
-    /// About the returned `Sender`: If a request to notify blocks is sent, the `Sender` sends the
-    /// block name specified (or whatever string is sent through). The `Block`, which should be
-    /// listening with a partnered `Receiver` in a different thread, can handle this data as it
+    /// About the returned `Sender`: If a request to notify blocks is sent, the
+    /// `Sender` sends the block name specified (or whatever string is sent
+    /// through). The `Block`, which should be listening with a partnered
+    /// `Receiver` in a different thread, can handle this data as it
     /// pleases.
     fn run(
         self: Box<Self>,
@@ -143,15 +148,16 @@ pub trait Block: Send + Sync {
     /// Updates the block, returning an error if the update fails.
     fn update(&mut self) -> Result<(), UpdateError>;
 
-    /// The next time at which the block will update, if any. If None, the block will immediately
-    /// stop polling/updating automatically.
+    /// The next time at which the block will update, if any. If None, the block
+    /// will immediately stop polling/updating automatically.
     fn next_update(&self) -> Option<NextUpdate>;
 
-    /// Output returns Some BlockOutputBody, or None. If None, the Block is hidden from the status
-    /// bar. If Some, the block is updated in the status bar.
+    /// Output returns Some BlockOutputBody, or None. If None, the Block is
+    /// hidden from the status bar. If Some, the block is updated in the
+    /// status bar.
     fn output(&self) -> Option<BlockOutput>;
 
-    /// Returns the name of the block, which is used as a sort of key in the status bar. It's used
-    /// to update blocks in the status bar.
+    /// Returns the name of the block, which is used as a sort of key in the
+    /// status bar. It's used to update blocks in the status bar.
     fn name(&self) -> &str;
 }

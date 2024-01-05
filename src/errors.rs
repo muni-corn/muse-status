@@ -1,11 +1,12 @@
-use crate::format::blocks::output::BlockOutput;
-use crate::format::color::RGBAParseError;
-use std::error::Error;
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use std::io::Error as IoError;
-use std::num::ParseIntError;
-use std::sync::mpsc::SendError;
+use std::{
+    error::Error,
+    fmt::{self, Display, Formatter},
+    io::Error as IoError,
+    num::ParseIntError,
+    sync::mpsc::SendError,
+};
+
+use crate::format::{blocks::output::BlockOutput, color::RGBAParseError};
 
 /// Wraps a number of errors that could be encountered throughout muse-status.
 #[derive(Debug)]
@@ -109,9 +110,9 @@ impl Display for BasicError {
 
 impl Error for BasicError {}
 
-/// UpdateError is returned when a Block fails to update for any reason. The block name and message
-/// are given to give the user (or developer) information about where and why an error happened
-/// while updating a Block.
+/// UpdateError is returned when a Block fails to update for any reason. The
+/// block name and message are given to give the user (or developer) information
+/// about where and why an error happened while updating a Block.
 #[derive(Debug)]
 pub struct UpdateError {
     /// The block name, to be used in the formatted output of the error.

@@ -8,7 +8,8 @@ pub struct NetworkIcons {
 }
 
 impl NetworkIcons {
-    /// Returns an icon according to the interface type and the status of its connection.
+    /// Returns an icon according to the interface type and the status of its
+    /// connection.
     pub fn get_from_status(&self, net_type: &NetworkType, status: &NetworkStatus) -> char {
         match net_type {
             NetworkType::Wired => self.wired.get_icon(status),
@@ -61,7 +62,8 @@ impl Default for WirelessIcons {
 }
 
 impl WirelessIcons {
-    /// Gets a wireless icon according to the status and signal strength of the interface.
+    /// Gets a wireless icon according to the status and signal strength of the
+    /// interface.
     pub fn get_icon(&self, status: &NetworkStatus, strength_percent: i32) -> char {
         match status {
             NetworkStatus::Disconnected => self.disconnected_icon,

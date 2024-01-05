@@ -6,20 +6,23 @@ pub mod color;
 
 // TODO create a separate module for Banner
 
-use crate::daemon::DataPayload;
-use crate::errors::{BasicError, MuseStatusError};
-use crate::format::blocks::output::BlockOutput;
-use crate::utils;
+use std::{collections::VecDeque, str::FromStr};
+
 use color::{Color, RGBA};
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
-use std::str::FromStr;
+
+use crate::{
+    daemon::DataPayload,
+    errors::{BasicError, MuseStatusError},
+    format::blocks::output::BlockOutput,
+    utils,
+};
 
 /// Eight spaces.
 const MARKUP_SEPARATOR: &str = "        ";
 
-/// Attention provides a way to easily apply colors to a Block, without actually passing any RGBA
-/// values.
+/// Attention provides a way to easily apply colors to a Block, without actually
+/// passing any RGBA values.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum Attention {
     /// Static dim color.
@@ -42,8 +45,8 @@ pub enum Attention {
 }
 
 impl Attention {
-    /// Returns the colors associated with this `Attention`. The two colors returned are the
-    /// primary and secondary colors, respectively.
+    /// Returns the colors associated with this `Attention`. The two colors
+    /// returned are the primary and secondary colors, respectively.
     pub fn colors(&self, f: &Formatter) -> (RGBA, RGBA) {
         match self {
             Self::Normal => (f.primary_color, f.secondary_color),
@@ -66,8 +69,8 @@ impl Attention {
     }
 }
 
-/// For different types of status modes, for different status bars that parse information
-/// differently
+/// For different types of status modes, for different status bars that parse
+/// information differently
 #[derive(PartialEq)]
 pub enum Mode {
     /// Lemonbar-compatabile output.
@@ -88,6 +91,7 @@ impl Default for Mode {
 
 impl FromStr for Mode {
     type Err = MuseStatusError;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "i3" => Ok(Self::JsonProtocol),
@@ -100,8 +104,9 @@ impl FromStr for Mode {
     }
 }
 
-/// Sets fonts, colors and more for muse-status. Its most important job is converting all data into
-/// a format that can be read by status bars (and you!).
+/// Sets fonts, colors and more for muse-status. Its most important job is
+/// converting all data into a format that can be read by status bars (and
+/// you!).
 pub struct Formatter {
     formatting_mode: Mode,
     primary_color: RGBA,
@@ -115,11 +120,12 @@ pub struct Formatter {
     banners: VecDeque<Banner>,
 }
 
-/// A banner temporarily hides all blocks on the status bar to bring information front and center
-/// for a set duration of time.
+/// A banner temporarily hides all blocks on the status bar to bring information
+/// front and center for a set duration of time.
 #[allow(dead_code)]
 pub struct Banner {
-    /// A unique identifier, used to update a banner if a twin (with the same id) is sent.
+    /// A unique identifier, used to update a banner if a twin (with the same
+    /// id) is sent.
     id: String,
 
     /// Banner content.
@@ -195,9 +201,10 @@ impl Formatter {
         Ok(formatter)
     }
 
-    /// Chains status bites together, ensuring that there are no awkward spaces between bites, and
-    /// outputs a result fit to be parsed by a status bar. The string can safely be printed as-is
-    /// without additional formatting or newlines.
+    /// Chains status bites together, ensuring that there are no awkward spaces
+    /// between bites, and outputs a result fit to be parsed by a status
+    /// bar. The string can safely be printed as-is without additional
+    /// formatting or newlines.
     pub fn format_data(&self, data: DataPayload) -> String {
         match self.formatting_mode {
             Mode::JsonProtocol => {
@@ -271,8 +278,8 @@ impl Formatter {
     }
 
     // TODO
-    // /// Formats an error in a format that can be parsed and displayed by a status bar. No
-    // /// additional formatting is required.
+    // /// Formats an error in a format that can be parsed and displayed by a status
+    // /// bar. No additional formatting is required.
     // pub fn format_error<E: std::error::Error>(&self, _: E) -> String {
     //     match self.formatting_mode {
     //         Mode::JsonProtocol => unimplemented!(),
@@ -320,7 +327,8 @@ impl Formatter {
     fn get_pulse_color(&self, color: &RGBA, seconds: f32) -> RGBA {
         let now = chrono::Local::now();
 
-        // interpolation is a value from zero to one, calculated by `unix_millis / max_millis`
+        // interpolation is a value from zero to one, calculated by `unix_millis /
+        // max_millis`
         let max_millis = (1000.0 * seconds) as i64;
         let unix_millis = now.timestamp_millis() % max_millis;
         let interpolation = utils::cubic_ease_arc(unix_millis as f32 / max_millis as f32);
@@ -355,7 +363,10 @@ impl Formatter {
 
         let json = JsonBlock {
             full_text,
-            short_text: short_text.unwrap_or_default(), // TODO: Make short_text optional. It is not required as part of the JSON protocol for sway.
+            short_text: short_text.unwrap_or_default(), /* TODO: Make short_text optional. It is
+                                                         * not required as part of the JSON
+                                                         * protocol for
+                                                         * sway. */
             separator: true,
             markup: String::from("pango"),
             name: block_output.name(),

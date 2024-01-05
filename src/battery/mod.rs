@@ -1,3 +1,8 @@
+use std::path::PathBuf;
+
+use chrono::{DateTime, Duration, Local};
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config::BatteryConfig,
     errors::*,
@@ -6,9 +11,6 @@ use crate::{
         Attention,
     },
 };
-use chrono::{DateTime, Duration, Local};
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// The status of a battery.
 #[derive(Clone, PartialEq)]
@@ -50,8 +52,8 @@ struct BatteryRead {
     charge: i32,
 }
 
-/// A remaining battery level while a battery is discharging, whether measured by percentage or
-/// minutes until complete depletion.
+/// A remaining battery level while a battery is discharging, whether measured
+/// by percentage or minutes until complete depletion.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialOrd, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum BatteryLevel {
@@ -160,8 +162,8 @@ impl BatteryBlock {
         Ok(raw.trim().parse()?)
     }
 
-    // XXX This function is a copy-and-paste of Self::get_batttery_charge. consider writing a
-    // function that handles similar functionality
+    // XXX This function is a copy-and-paste of Self::get_batttery_charge. consider
+    // writing a function that handles similar functionality
     fn update_battery_charge_max(&mut self) -> Result<(), MuseStatusError> {
         let raw = match std::fs::read_to_string(self.get_base_dir().join("charge_full")) {
             Ok(s) => s,
@@ -187,8 +189,8 @@ impl BatteryBlock {
         PathBuf::from(SYS_POWER_SUPPLY_BASE_DIR).join(&self.battery)
     }
 
-    /// Returns the amount of nanoseconds left until the battery will be either fully charged or
-    /// completely depleted.
+    /// Returns the amount of nanoseconds left until the battery will be either
+    /// fully charged or completely depleted.
     fn get_nanos_left(&self) -> Option<i64> {
         let rate = match &self.current_read.as_ref()?.status {
             ChargeStatus::Charging => self.average_charging_rate?,
@@ -207,8 +209,8 @@ impl BatteryBlock {
         Some(nanos_left as i64)
     }
 
-    /// Returns the amount of minutes left until the battery will be either fully charged or
-    /// completely depleted.
+    /// Returns the amount of minutes left until the battery will be either
+    /// fully charged or completely depleted.
     fn get_minutes_left(&self) -> Option<i64> {
         self.get_nanos_left()
             .map(|n| Duration::nanoseconds(n).num_minutes())
@@ -221,14 +223,15 @@ impl BatteryBlock {
             .map(|current_read| current_read.charge as f32 / self.charge_full as f32)
     }
 
-    /// Returns the time at which the battery will be either fully charged or completely depleted.
+    /// Returns the time at which the battery will be either fully charged or
+    /// completely depleted.
     fn get_completion_time(&self) -> Option<DateTime<Local>> {
         self.get_nanos_left()
             .map(|n| Local::now() + Duration::nanoseconds(n))
     }
 
-    /// Returns true if the battery is at or below the warning level. If no current battery reading
-    /// is saved, the method returns false.
+    /// Returns true if the battery is at or below the warning level. If no
+    /// current battery reading is saved, the method returns false.
     fn is_warning(&self) -> bool {
         match self.warning_level {
             BatteryLevel::MinutesLeft(warning_minutes) => match self.get_minutes_left() {
@@ -242,8 +245,8 @@ impl BatteryBlock {
         }
     }
 
-    /// Returns true if the battery is at or below the alarm level. If no current battery reading
-    /// is saved, the method returns false.
+    /// Returns true if the battery is at or below the alarm level. If no
+    /// current battery reading is saved, the method returns false.
     fn is_alarm(&self) -> bool {
         match self.alarm_level {
             BatteryLevel::MinutesLeft(alarm_minutes) => match self.get_minutes_left() {
@@ -450,55 +453,54 @@ fn get_battery_icon(status: &ChargeStatus, percentage: i32) -> char {
     }
 }
 
-/*  DATA FILE FORMAT
-
-data recorded like so:
-key %/hour records
-
-where "records" is the amount of times the parameter has been recorded.
-used for recording a new average based on the current average and how
-many times the parameter has been recorded before
-for example:
-
-C 3.14159 200
-
---- BEGIN FILE EXAMPLE ------------------------------------------------
-
-C			| charging avg
-C0			|
-C1  		        |
-C2			| charging values by percentage
-...			|
-C9			|
-
-D			| discharging avg
-D0			|
-D1			|
-D2			| discharging avg values by hour of day
-...			| (used for predicting nonexistent day-by-day values)
-D23			|
-
-S0			| sunday
-S1			|
-S2			| discharging values by hour by day of week
-...			|
-S23			|
-
-M0			| monday
-...                     |
-
-T0			| thursday
-...                     |
-
-W0			| wednesday
-...                     |
-
-R0			| thursday
-...                     |
-
-F0			| friday
-...                     |
-
-A0			| saturday
-...                     |
-*/
+//  DATA FILE FORMAT
+//
+// data recorded like so:
+// key %/hour records
+//
+// where "records" is the amount of times the parameter has been recorded.
+// used for recording a new average based on the current average and how
+// many times the parameter has been recorded before
+// for example:
+//
+// C 3.14159 200
+//
+// --- BEGIN FILE EXAMPLE ------------------------------------------------
+//
+// C			| charging avg
+// C0			|
+// C1  		        |
+// C2			| charging values by percentage
+// ...			|
+// C9			|
+//
+// D			| discharging avg
+// D0			|
+// D1			|
+// D2			| discharging avg values by hour of day
+// ...			| (used for predicting nonexistent day-by-day values)
+// D23			|
+//
+// S0			| sunday
+// S1			|
+// S2			| discharging values by hour by day of week
+// ...			|
+// S23			|
+//
+// M0			| monday
+// ...                     |
+//
+// T0			| thursday
+// ...                     |
+//
+// W0			| wednesday
+// ...                     |
+//
+// R0			| thursday
+// ...                     |
+//
+// F0			| friday
+// ...                     |
+//
+// A0			| saturday
+// ...                     |

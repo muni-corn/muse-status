@@ -1,6 +1,16 @@
-use crate::{battery::BatteryLevel, errors::BasicError, errors::MuseStatusError, weather::Units};
+use std::{
+    collections::HashMap,
+    fs::File,
+    path::{Path, PathBuf},
+};
+
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs::File, path::Path, path::PathBuf};
+
+use crate::{
+    battery::BatteryLevel,
+    errors::{BasicError, MuseStatusError},
+    weather::Units,
+};
 
 /// Configuration for all of muse-status.
 #[derive(Debug, Deserialize, Serialize)]
@@ -18,7 +28,8 @@ pub struct Config {
     /// The ordering of tertiary-level blocks.
     pub tertiary_order: Vec<String>,
 
-    /// The name of the brightness directory in Linux's /sys/class/backlight directory.
+    /// The name of the brightness directory in Linux's /sys/class/backlight
+    /// directory.
     pub brightness_id: String,
 
     /// The audio sink to use for the volume block.
@@ -67,8 +78,8 @@ impl Config {
     pub fn from_file<P: AsRef<Path>>(p: P) -> Result<Config, MuseStatusError> {
         let path = p.as_ref();
         if !path.exists() {
-            // if the file path doesn't exist, write the default config to it, then return the
-            // default config.
+            // if the file path doesn't exist, write the default config to it, then return
+            // the default config.
             Self::write_default_config(path)?;
             Ok(Self::default())
         } else {
@@ -156,8 +167,8 @@ impl Default for WeatherConfig {
             default_icon: '\u{F1BF9}',
             update_interval_minutes: 20,
 
-            // although i'm in the US, the rest of the world uses metric, so let's appeal to the
-            // masses
+            // although i'm in the US, the rest of the world uses metric, so let's appeal to
+            // the masses
             units: Units::Metric,
         }
     }
@@ -174,8 +185,8 @@ pub fn default_config_path() -> Result<PathBuf, MuseStatusError> {
     }
 }
 
-/// Default weather icons using the Material Design Icons font. Codes are taken from here,
-/// according to wttr.in: https://www.worldweatheronline.com/weather-api/api/docs/weather-icons.aspx
+/// Default weather icons using the Material Design Icons font. Codes are taken
+/// from here, according to wttr.in: https://www.worldweatheronline.com/weather-api/api/docs/weather-icons.aspx
 const DEFAULT_WEATHER_ICONS: [(&str, char); 48] = [
     // Clear/Sunny
     ("113", '\u{F0599}'),
@@ -275,8 +286,8 @@ const DEFAULT_WEATHER_ICONS: [(&str, char); 48] = [
     ("395", '\u{F0593}'),
 ];
 
-/// Default weather icons for nighttime weather using the Material Design Icons font. Codes are
-/// taken from here, according to wttr.in:
+/// Default weather icons for nighttime weather using the Material Design Icons
+/// font. Codes are taken from here, according to wttr.in:
 /// https://www.worldweatheronline.com/weather-api/api/docs/weather-icons.aspx
 const DEFAULT_NIGHT_WEATHER_ICONS: [(&str, char); 7] = [
     // Clear/Sunny

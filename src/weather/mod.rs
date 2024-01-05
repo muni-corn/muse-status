@@ -1,5 +1,9 @@
 mod structs;
 
+use chrono::Duration;
+use serde::{Deserialize, Serialize};
+use structs::*;
+
 use crate::{
     config::WeatherConfig,
     errors::*,
@@ -8,9 +12,6 @@ use crate::{
         Attention,
     },
 };
-use chrono::Duration;
-use serde::{Deserialize, Serialize};
-use structs::*;
 
 /// Type of units to use when reporting locale-specific measurements.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -23,8 +24,9 @@ pub enum Units {
     Metric,
 }
 
-/// WeatherBlock returns information about the weather around the user's current location.
-/// OpenWeatherMap and IPStack are used for weather and location respectively.
+/// WeatherBlock returns information about the weather around the user's current
+/// location. OpenWeatherMap and IPStack are used for weather and location
+/// respectively.
 pub struct WeatherBlock {
     config: WeatherConfig,
     current_report: Option<WttrReport>,
@@ -83,7 +85,8 @@ impl Block for WeatherBlock {
     fn update(&mut self) -> Result<(), UpdateError> {
         let mut wait_time_seconds = 1;
 
-        // continually try to update with exponential falloff until we have a successful update
+        // continually try to update with exponential falloff until we have a successful
+        // update
         while let Err(e) = self.update_current_report() {
             eprintln!(
                 "couldn't update weather: {}. trying again in {} seconds",

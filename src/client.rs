@@ -1,15 +1,17 @@
-use crate::{
-    config::{self, Config},
-    daemon::{Collection, DaemonMsg, DataPayload},
-    errors::MuseStatusError,
-    format::{blocks::BlockOutput, Formatter, Mode},
-};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     io::{BufRead, BufReader, Write},
     net::TcpStream,
     path::PathBuf,
+};
+
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{self, Config},
+    daemon::{Collection, DaemonMsg, DataPayload},
+    errors::MuseStatusError,
+    format::{blocks::BlockOutput, Formatter, Mode},
 };
 
 /// A Client that connects to the Daemon and receives data.
@@ -27,16 +29,19 @@ impl Client {
         })
     }
 
-    /// Have the Client send its message to the daemon. This functions consumes the Client.
+    /// Have the Client send its message to the daemon. This functions consumes
+    /// the Client.
     ///
-    /// If the client should subscribe to the daemon, it will receive updates (first requesting
-    /// all data) and then output formatted data to stdout.
+    /// If the client should subscribe to the daemon, it will receive updates
+    /// (first requesting all data) and then output formatted data to
+    /// stdout.
     ///
-    /// If the client should request the daemon to update, it will send its request and then quit.
+    /// If the client should request the daemon to update, it will send its
+    /// request and then quit.
     ///
-    /// If the client should do nothing, it summons a unicorn. But you can't see it. You'll never
-    /// know it was summoned. You'll just think that nothing happened, because that's exactly what
-    /// Noop does.
+    /// If the client should do nothing, it summons a unicorn. But you can't see
+    /// it. You'll never know it was summoned. You'll just think that
+    /// nothing happened, because that's exactly what Noop does.
     pub fn act(self) -> Result<(), MuseStatusError> {
         match &self.args.client_msg {
             ClientMsg::Noop => {
@@ -72,8 +77,8 @@ impl Client {
         }
     }
 
-    /// If the client should subscribe and output data, handle that. Because this function never
-    /// returns, it will take ownership of `self`.
+    /// If the client should subscribe and output data, handle that. Because
+    /// this function never returns, it will take ownership of `self`.
     pub fn handle_subscription(mut self, mut daemon_conn: TcpStream, collection: &Collection) -> ! {
         let formatter = Formatter::from_env().unwrap();
 
@@ -84,7 +89,8 @@ impl Client {
         }
 
         loop {
-            // create a buffered stream, which we'll read from line by line for status outputs
+            // create a buffered stream, which we'll read from line by line for status
+            // outputs
             let mut buf_stream = BufReader::new(daemon_conn);
 
             // listen for outputs from the daemon and print them
@@ -207,9 +213,10 @@ impl ClientArgs {
     pub fn from_env() -> Result<Self, MuseStatusError> {
         let mut result = Self::default();
 
-        // a temporary type to pick up the pieces passed through the command line. (it would be
-        // difficult to get the message type and the collection argument at the same time, so we
-        // have separate variables for `msg_type` and `collection`)
+        // a temporary type to pick up the pieces passed through the command line. (it
+        // would be difficult to get the message type and the collection
+        // argument at the same time, so we have separate variables for
+        // `msg_type` and `collection`)
         enum ClientMsgType {
             Subscribe,
             Update,
