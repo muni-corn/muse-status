@@ -318,17 +318,12 @@ impl Formatter {
     }
 
     fn get_pulse_color(&self, color: &RGBA, seconds: f32) -> RGBA {
-        use std::time::Duration;
-
         let now = chrono::Local::now();
 
-        // get alpha byte value. interpolation is a value from
-        // zero to one, calculated by `unix_millis / max_millis`
-        let max_millis: u64 = (1000.0 * seconds) as u64;
-        let unix_millis: u128 = (now.timestamp_nanos() as u128
-            / Duration::from_millis(1).as_nanos())
-            % max_millis as u128;
-        let interpolation = utils::cubic_ease_arc((unix_millis / max_millis as u128) as f32);
+        // interpolation is a value from zero to one, calculated by `unix_millis / max_millis`
+        let max_millis = (1000.0 * seconds) as i64;
+        let unix_millis = now.timestamp_millis() % max_millis;
+        let interpolation = utils::cubic_ease_arc(unix_millis as f32 / max_millis as f32);
 
         color::interpolate_colors(&self.secondary_color, color, interpolation)
     }
@@ -360,9 +355,7 @@ impl Formatter {
 
         let json = JsonBlock {
             full_text,
-            short_text: short_text.unwrap_or_default(), // TODO: Make short_text optional.
-                                                        // It is not required as part of
-                                                        // the JSON protocol for sway.
+            short_text: short_text.unwrap_or_default(), // TODO: Make short_text optional. It is not required as part of the JSON protocol for sway.
             separator: true,
             markup: String::from("pango"),
             name: block_output.name(),
