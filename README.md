@@ -1,3 +1,8 @@
+# abandoned
+
+`muse-status` has been abandoned in favor of
+[muse-shell](https://github.com/muni-corn/muse-shell).
+
 # muse-status
 
 Shamelessly the most beautiful status command for your Linux
